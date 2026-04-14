@@ -8,6 +8,7 @@ export interface MarkdownOptions {
   includeThinking: boolean;
   includeTimestamps: boolean;
   maxToolOutputLines: number;
+  maxMessageLines: number; // 0 = unlimited; truncates individual user/assistant messages
 }
 
 export const DEFAULT_MARKDOWN_OPTIONS: MarkdownOptions = {
@@ -16,6 +17,7 @@ export const DEFAULT_MARKDOWN_OPTIONS: MarkdownOptions = {
   includeThinking: false,
   includeTimestamps: false,
   maxToolOutputLines: 50,
+  maxMessageLines: 0,
 };
 
 /** Convert a single Session to a Markdown string. */
@@ -89,7 +91,6 @@ export function sessionsToMarkdown(
   // Individual sessions
   for (const session of sessions) {
     parts.push(sessionToMarkdown(session, opts));
-    parts.push('');
     parts.push('---');
     parts.push('');
   }
@@ -108,18 +109,16 @@ function renderEvent(ev: SessionEvent, opts: MarkdownOptions): string[] {
   switch (ev.kind) {
     case 'user':
       if (!ev.text) return [];
-      lines.push('## User');
+      lines.push(`#### User${tsPrefix ? '  ' + tsPrefix : ''}`);
       lines.push('');
-      if (tsPrefix) lines.push(tsPrefix);
-      lines.push(ev.text.trim());
+      lines.push(truncateMessage(ev.text.trim(), opts.maxMessageLines));
       return lines;
 
     case 'assistant':
       if (!ev.text) return [];
-      lines.push('## Assistant');
+      lines.push(`#### Assistant${tsPrefix ? '  ' + tsPrefix : ''}`);
       lines.push('');
-      if (tsPrefix) lines.push(tsPrefix);
-      lines.push(ev.text.trim());
+      lines.push(truncateMessage(ev.text.trim(), opts.maxMessageLines));
       return lines;
 
     case 'tool_call':
@@ -180,6 +179,13 @@ function truncateLines(text: string, maxLines: number): string {
   const lines = text.split('\n');
   if (lines.length <= maxLines) return text;
   return lines.slice(0, maxLines).join('\n') + `\n... [${lines.length - maxLines} lines truncated]`;
+}
+
+function truncateMessage(text: string, maxLines: number): string {
+  if (maxLines === 0) return text;
+  const lines = text.split('\n');
+  if (lines.length <= maxLines) return text;
+  return lines.slice(0, maxLines).join('\n') + `\n*… [${lines.length - maxLines} lines omitted]*`;
 }
 
 function escapeMarkdown(s: string): string {

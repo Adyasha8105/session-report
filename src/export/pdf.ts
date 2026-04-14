@@ -55,19 +55,24 @@ export async function exportToPdf(
   const tokens = marked.lexer(markdownContent);
   renderTokenList(doc, tokens);
 
-  // Add page numbers to all pages
+  // Add page numbers to all pages.
+  // IMPORTANT: doc.text() at y > (page.height - margins.bottom) triggers pdfkit to add a blank
+  // page. Temporarily zero the bottom margin so the placement is within the "safe" area.
   const range = (doc as unknown as { bufferedPageRange(): { start: number; count: number } }).bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
+    const savedBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
     doc
       .font(F.regular)
       .fontSize(8)
       .fillColor(C.muted)
-      .text(`${i + 1} / ${range.count}`, 0, doc.page.height - 40, {
+      .text(`${i + 1} / ${range.count}`, 0, doc.page.height - 36, {
         width: doc.page.width,
         align: 'center',
         lineBreak: false,
       });
+    doc.page.margins.bottom = savedBottom;
   }
 
   doc.end();
@@ -107,55 +112,72 @@ function renderToken(doc: PDFKit.PDFDocument, token: Token): void {
     case 'list':       return renderList(doc, token as Tokens.List);
     case 'table':      return renderTable(doc, token as Tokens.Table);
     case 'hr':         return renderHr(doc);
-    case 'space':      doc.moveDown(0.3); break;
+    case 'space':      doc.moveDown(0.1); break;
   }
 }
 
 function renderHeading(doc: PDFKit.PDFDocument, token: Tokens.Heading): void {
-  const cfg: Record<number, { size: number; color: string; before: number }> = {
-    1: { size: 22, color: C.heading1, before: 1.2 },
-    2: { size: 16, color: C.heading2, before: 0.9 },
-    3: { size: 13, color: C.heading3, before: 0.5 },
-    4: { size: 11, color: C.heading3, before: 0.3 },
-    5: { size: 10, color: C.muted,    before: 0.2 },
-    6: { size: 9,  color: C.muted,    before: 0.2 },
+  const cfg: Record<number, { size: number; color: string; before: number; after: number }> = {
+    1: { size: 20, color: C.heading1, before: 1.0, after: 0.2 },
+    2: { size: 14, color: C.heading2, before: 0.7, after: 0.15 },
+    3: { size: 11, color: C.heading3, before: 0.4, after: 0.1 },
+    4: { size: 10, color: C.muted,    before: 0.3, after: 0.05 },
+    5: { size: 9,  color: C.muted,    before: 0.2, after: 0.05 },
+    6: { size: 9,  color: C.muted,    before: 0.1, after: 0.05 },
   };
-  const { size, color, before } = cfg[token.depth] ?? cfg[3]!;
+  const { size, color, before, after } = cfg[token.depth] ?? cfg[3]!;
   doc.moveDown(before);
   doc.font(F.bold).fontSize(size).fillColor(color).text(stripInlineMarkdown(token.text));
-  doc.moveDown(0.15);
+  doc.moveDown(after);
   doc.font(F.regular).fontSize(10).fillColor(C.text);
 }
 
 function renderParagraph(doc: PDFKit.PDFDocument, token: Tokens.Paragraph): void {
-  doc.moveDown(0.15);
+  doc.moveDown(0.1);
   renderInlineTokens(doc, token.tokens ?? [{ type: 'text', text: token.text, raw: token.text }]);
-  doc.moveDown(0.25);
+  doc.moveDown(0.15);
 }
 
 function renderCode(doc: PDFKit.PDFDocument, token: Tokens.Code): void {
-  const lines = token.text.split('\n');
+  const rawLines = token.text.split('\n');
   const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  const padding = 8;
-  const lineH = 12;
-  const blockH = lines.length * lineH + padding * 2;
-
-  doc.moveDown(0.4);
   const x = doc.page.margins.left;
-  const y = doc.y;
+  const lineH = 13;
+  const padX = 10;
+  const padY = 2;
+  // Approx chars that fit: Courier 8pt ≈ 5.4pt per char
+  const maxChars = Math.max(40, Math.floor((pageWidth - padX * 2 - 6) / 5.4));
 
-  doc.rect(x, y, pageWidth, blockH).fill(C.codeBg);
-  doc.rect(x, y, 3, blockH).fill(C.codeBar);
-
-  doc.font(F.mono).fontSize(8).fillColor(C.codeText);
-  for (let i = 0; i < lines.length; i++) {
-    doc.text(lines[i] || ' ', x + padding + 3, y + padding + i * lineH, {
-      width: pageWidth - padding * 2 - 6,
-      lineBreak: false,
-    });
+  // Wrap long lines at character boundary
+  const lines: string[] = [];
+  for (const raw of rawLines) {
+    if (raw.length <= maxChars) {
+      lines.push(raw);
+    } else {
+      for (let i = 0; i < raw.length; i += maxChars) {
+        lines.push(raw.slice(i, i + maxChars));
+      }
+    }
   }
 
-  doc.y = y + blockH;
+  doc.moveDown(0.4);
+
+  for (const line of lines) {
+    // Page break if line won't fit
+    if (doc.y + lineH > doc.page.height - doc.page.margins.bottom - 10) {
+      doc.addPage();
+    }
+    const y = doc.y;
+    doc.rect(x, y, pageWidth, lineH).fill(C.codeBg);
+    doc.rect(x, y, 3, lineH).fill(C.codeBar);
+    doc.font(F.mono).fontSize(8).fillColor(C.codeText)
+      .text(line || ' ', x + padX, y + padY, {
+        width: pageWidth - padX * 2 - 3,
+        lineBreak: false,
+      });
+    doc.y = y + lineH;
+  }
+
   doc.moveDown(0.4);
   doc.font(F.regular).fontSize(10).fillColor(C.text);
 }
@@ -244,13 +266,12 @@ function renderTable(doc: PDFKit.PDFDocument, token: Tokens.Table): void {
 
 function renderHr(doc: PDFKit.PDFDocument): void {
   const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  doc.moveDown(0.5);
   doc
     .moveTo(doc.page.margins.left, doc.y)
     .lineTo(doc.page.margins.left + pageWidth, doc.y)
     .lineWidth(0.5)
     .stroke(C.hrLine);
-  doc.moveDown(0.5);
+  doc.moveDown(0.3);
 }
 
 // ---- Inline token rendering ----

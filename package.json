@@ -1,6 +1,6 @@
 {
   "name": "session-report",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Export AI coding assistant sessions (Claude Code, Codex CLI, Cursor) to PDF or DOCX",
   "type": "module",
   "bin": {

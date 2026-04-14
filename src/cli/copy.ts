@@ -22,6 +22,7 @@ export function createCopyCommand(): Command {
     .option('--include-thinking', 'Include thinking blocks')
     .option('--include-timestamps', 'Prefix events with timestamps')
     .option('--max-chars <n>', `Truncate output to N characters (default: ${DEFAULT_MAX_CHARS})`)
+    .option('--max-message-lines <n>', 'Truncate each message after N lines, 0 = unlimited (default: 0)', '0')
     .option('--stdout', 'Print to stdout instead of copying to clipboard')
     .option('--claude-root <path>', 'Override ~/.claude directory')
     .option('--codex-root <path>', 'Override ~/.codex directory')
@@ -38,6 +39,7 @@ export function createCopyCommand(): Command {
         includeToolCalls: Boolean(opts.includeToolCalls),
         includeThinking: Boolean(opts.includeThinking),
         includeTimestamps: Boolean(opts.includeTimestamps),
+        maxMessageLines: parseInt(opts.maxMessageLines, 10) || 0,
       };
 
       const spinner = ora('Finding sessions…').start();

@@ -13948,7 +13948,8 @@ var DEFAULT_MARKDOWN_OPTIONS = {
   includeMetaEvents: false,
   includeThinking: false,
   includeTimestamps: false,
-  maxToolOutputLines: 50
+  maxToolOutputLines: 50,
+  maxMessageLines: 0
 };
 function sessionToMarkdown(session, opts = DEFAULT_MARKDOWN_OPTIONS) {
   const lines = [];
@@ -14003,7 +14004,6 @@ function sessionsToMarkdown(sessions, opts = DEFAULT_MARKDOWN_OPTIONS) {
   parts.push("");
   for (const session of sessions) {
     parts.push(sessionToMarkdown(session, opts));
-    parts.push("");
     parts.push("---");
     parts.push("");
   }
@@ -14015,17 +14015,15 @@ function renderEvent(ev, opts) {
   switch (ev.kind) {
     case "user":
       if (!ev.text) return [];
-      lines.push("## User");
+      lines.push(`#### User${tsPrefix ? "  " + tsPrefix : ""}`);
       lines.push("");
-      if (tsPrefix) lines.push(tsPrefix);
-      lines.push(ev.text.trim());
+      lines.push(truncateMessage(ev.text.trim(), opts.maxMessageLines));
       return lines;
     case "assistant":
       if (!ev.text) return [];
-      lines.push("## Assistant");
+      lines.push(`#### Assistant${tsPrefix ? "  " + tsPrefix : ""}`);
       lines.push("");
-      if (tsPrefix) lines.push(tsPrefix);
-      lines.push(ev.text.trim());
+      lines.push(truncateMessage(ev.text.trim(), opts.maxMessageLines));
       return lines;
     case "tool_call":
       if (!opts.includeToolCalls) return [];
@@ -14080,6 +14078,13 @@ function truncateLines(text, maxLines) {
   if (lines.length <= maxLines) return text;
   return lines.slice(0, maxLines).join("\n") + `
 ... [${lines.length - maxLines} lines truncated]`;
+}
+function truncateMessage(text, maxLines) {
+  if (maxLines === 0) return text;
+  const lines = text.split("\n");
+  if (lines.length <= maxLines) return text;
+  return lines.slice(0, maxLines).join("\n") + `
+*\u2026 [${lines.length - maxLines} lines omitted]*`;
 }
 function escapeMarkdown(s) {
   return s.replace(/[[\]`*_{}()#+\-.!]/g, "\\$&");
@@ -16375,11 +16380,14 @@ async function exportToPdf(markdownContent, outputPath, options2) {
   const range2 = doc.bufferedPageRange();
   for (let i = 0; i < range2.count; i++) {
     doc.switchToPage(range2.start + i);
-    doc.font(F.regular).fontSize(8).fillColor(C.muted).text(`${i + 1} / ${range2.count}`, 0, doc.page.height - 40, {
+    const savedBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    doc.font(F.regular).fontSize(8).fillColor(C.muted).text(`${i + 1} / ${range2.count}`, 0, doc.page.height - 36, {
       width: doc.page.width,
       align: "center",
       lineBreak: false
     });
+    doc.page.margins.bottom = savedBottom;
   }
   doc.end();
   return new Promise((resolve, reject) => {
@@ -16416,49 +16424,62 @@ function renderToken(doc, token) {
     case "hr":
       return renderHr(doc);
     case "space":
-      doc.moveDown(0.3);
+      doc.moveDown(0.1);
       break;
   }
 }
 function renderHeading(doc, token) {
   const cfg = {
-    1: { size: 22, color: C.heading1, before: 1.2 },
-    2: { size: 16, color: C.heading2, before: 0.9 },
-    3: { size: 13, color: C.heading3, before: 0.5 },
-    4: { size: 11, color: C.heading3, before: 0.3 },
-    5: { size: 10, color: C.muted, before: 0.2 },
-    6: { size: 9, color: C.muted, before: 0.2 }
+    1: { size: 20, color: C.heading1, before: 1, after: 0.2 },
+    2: { size: 14, color: C.heading2, before: 0.7, after: 0.15 },
+    3: { size: 11, color: C.heading3, before: 0.4, after: 0.1 },
+    4: { size: 10, color: C.muted, before: 0.3, after: 0.05 },
+    5: { size: 9, color: C.muted, before: 0.2, after: 0.05 },
+    6: { size: 9, color: C.muted, before: 0.1, after: 0.05 }
   };
-  const { size, color, before } = cfg[token.depth] ?? cfg[3];
+  const { size, color, before, after } = cfg[token.depth] ?? cfg[3];
   doc.moveDown(before);
   doc.font(F.bold).fontSize(size).fillColor(color).text(stripInlineMarkdown(token.text));
-  doc.moveDown(0.15);
+  doc.moveDown(after);
   doc.font(F.regular).fontSize(10).fillColor(C.text);
 }
 function renderParagraph(doc, token) {
-  doc.moveDown(0.15);
+  doc.moveDown(0.1);
   renderInlineTokens(doc, token.tokens ?? [{ type: "text", text: token.text, raw: token.text }]);
-  doc.moveDown(0.25);
+  doc.moveDown(0.15);
 }
 function renderCode(doc, token) {
-  const lines = token.text.split("\n");
+  const rawLines = token.text.split("\n");
   const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  const padding = 8;
-  const lineH = 12;
-  const blockH = lines.length * lineH + padding * 2;
-  doc.moveDown(0.4);
   const x = doc.page.margins.left;
-  const y = doc.y;
-  doc.rect(x, y, pageWidth, blockH).fill(C.codeBg);
-  doc.rect(x, y, 3, blockH).fill(C.codeBar);
-  doc.font(F.mono).fontSize(8).fillColor(C.codeText);
-  for (let i = 0; i < lines.length; i++) {
-    doc.text(lines[i] || " ", x + padding + 3, y + padding + i * lineH, {
-      width: pageWidth - padding * 2 - 6,
+  const lineH = 13;
+  const padX = 10;
+  const padY = 2;
+  const maxChars = Math.max(40, Math.floor((pageWidth - padX * 2 - 6) / 5.4));
+  const lines = [];
+  for (const raw of rawLines) {
+    if (raw.length <= maxChars) {
+      lines.push(raw);
+    } else {
+      for (let i = 0; i < raw.length; i += maxChars) {
+        lines.push(raw.slice(i, i + maxChars));
+      }
+    }
+  }
+  doc.moveDown(0.4);
+  for (const line of lines) {
+    if (doc.y + lineH > doc.page.height - doc.page.margins.bottom - 10) {
+      doc.addPage();
+    }
+    const y = doc.y;
+    doc.rect(x, y, pageWidth, lineH).fill(C.codeBg);
+    doc.rect(x, y, 3, lineH).fill(C.codeBar);
+    doc.font(F.mono).fontSize(8).fillColor(C.codeText).text(line || " ", x + padX, y + padY, {
+      width: pageWidth - padX * 2 - 3,
       lineBreak: false
     });
+    doc.y = y + lineH;
   }
-  doc.y = y + blockH;
   doc.moveDown(0.4);
   doc.font(F.regular).fontSize(10).fillColor(C.text);
 }
@@ -16521,9 +16542,8 @@ function renderTable(doc, token) {
 }
 function renderHr(doc) {
   const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  doc.moveDown(0.5);
   doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.margins.left + pageWidth, doc.y).lineWidth(0.5).stroke(C.hrLine);
-  doc.moveDown(0.5);
+  doc.moveDown(0.3);
 }
 function renderInlineTokens(doc, tokens) {
   const segs = [];
@@ -36210,21 +36230,35 @@ function paragraphToDocx(token) {
 }
 function codeBlockToDocx(token) {
   const lines = token.text.split("\n");
-  return lines.map(
-    (line) => new Paragraph({
-      children: [
-        new TextRun({
-          text: line || " ",
-          font: { name: "Courier New" },
-          size: 18,
-          color: "333333"
-        })
-      ],
+  const runs = [];
+  lines.forEach((line, i) => {
+    runs.push(
+      new TextRun({
+        text: line || "\xA0",
+        // non-breaking space keeps empty lines visible
+        font: { name: "Courier New" },
+        size: 18,
+        color: "333333"
+      })
+    );
+    if (i < lines.length - 1) {
+      runs.push(new TextRun({ break: 1 }));
+    }
+  });
+  return [
+    new Paragraph({
+      children: runs,
       shading: { type: ShadingType.CLEAR, color: "auto", fill: "F4F4F4" },
-      spacing: { before: 0, after: 0, line: 240 },
-      indent: { left: 360 }
+      border: {
+        top: { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB", space: 4 },
+        bottom: { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB", space: 4 },
+        left: { style: BorderStyle.THICK, size: 16, color: "6366F1", space: 6 },
+        right: { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB", space: 4 }
+      },
+      spacing: { before: 160, after: 160, line: 260 },
+      indent: { left: 240, right: 240 }
     })
-  );
+  ];
 }
 function blockquoteToDocx(token) {
   const text = stripInlineMarkdown2(token.text);
@@ -36328,7 +36362,7 @@ function stripInlineMarkdown2(s) {
 
 // src/cli/export.ts
 function createExportCommand() {
-  return new Command("export").description("Export sessions to PDF or DOCX").option("--format <format>", "Output format: pdf or docx", "docx").option("--mode <mode>", "Export mode: single | combined | split-provider | split-repo", "combined").option("--output <dir>", "Output directory", "./session-reports").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--repo <name>", "Substring match on git repository name").option("--worktree", "Only include worktree sessions").option("--session <id>", "Export a single session by ID prefix").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-meta", "Include system/meta events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-tool-lines <n>", "Max lines of tool output to include", "50").option("--no-housekeeping", "Exclude sessions with no assistant output").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
+  return new Command("export").description("Export sessions to PDF or DOCX").option("--format <format>", "Output format: pdf or docx", "docx").option("--mode <mode>", "Export mode: single | combined | split-provider | split-repo", "combined").option("--output <dir>", "Output directory", "./session-reports").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--repo <name>", "Substring match on git repository name").option("--worktree", "Only include worktree sessions").option("--session <id>", "Export a single session by ID prefix").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-meta", "Include system/meta events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-tool-lines <n>", "Max lines of tool output to include", "50").option("--max-message-lines <n>", "Truncate each message after N lines, 0 = unlimited (default: 0)", "0").option("--no-housekeeping", "Exclude sessions with no assistant output").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
     const format = opts.format;
     const mode = opts.mode;
     if (!["pdf", "docx"].includes(format)) {
@@ -36345,7 +36379,8 @@ function createExportCommand() {
       includeMetaEvents: Boolean(opts.includeMeta),
       includeThinking: Boolean(opts.includeThinking),
       includeTimestamps: Boolean(opts.includeTimestamps),
-      maxToolOutputLines: parseInt(opts.maxToolLines, 10) || 50
+      maxToolOutputLines: parseInt(opts.maxToolLines, 10) || 50,
+      maxMessageLines: parseInt(opts.maxMessageLines, 10) || 0
     };
     const spinner = ora("Scanning sessions\u2026").start();
     try {
@@ -36464,14 +36499,15 @@ function groupBy(arr, key) {
 var import_child_process = require("child_process");
 var DEFAULT_MAX_CHARS = 8e4;
 function createCopyCommand() {
-  return new Command("copy").description("Copy session context to clipboard for pasting into another AI tool").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--session <id>", "Copy a specific session by ID prefix").option("--repo <name>", "Substring match on git repository name").option("--last <n>", "Number of most recent sessions to include", "1").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-chars <n>", `Truncate output to N characters (default: ${DEFAULT_MAX_CHARS})`).option("--stdout", "Print to stdout instead of copying to clipboard").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
+  return new Command("copy").description("Copy session context to clipboard for pasting into another AI tool").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--session <id>", "Copy a specific session by ID prefix").option("--repo <name>", "Substring match on git repository name").option("--last <n>", "Number of most recent sessions to include", "1").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-chars <n>", `Truncate output to N characters (default: ${DEFAULT_MAX_CHARS})`).option("--max-message-lines <n>", "Truncate each message after N lines, 0 = unlimited (default: 0)", "0").option("--stdout", "Print to stdout instead of copying to clipboard").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
     const last = Math.max(1, parseInt(opts.last, 10) || 1);
     const maxChars = parseInt(opts.maxChars, 10) || DEFAULT_MAX_CHARS;
     const markdownOpts = {
       ...DEFAULT_MARKDOWN_OPTIONS,
       includeToolCalls: Boolean(opts.includeToolCalls),
       includeThinking: Boolean(opts.includeThinking),
-      includeTimestamps: Boolean(opts.includeTimestamps)
+      includeTimestamps: Boolean(opts.includeTimestamps),
+      maxMessageLines: parseInt(opts.maxMessageLines, 10) || 0
     };
     const spinner = ora("Finding sessions\u2026").start();
     try {

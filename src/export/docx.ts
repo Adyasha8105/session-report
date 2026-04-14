@@ -11,7 +11,6 @@ import {
   TableRow,
   TableCell,
   BorderStyle,
-  AlignmentType,
   ShadingType,
   WidthType,
   TableLayoutType,
@@ -124,22 +123,38 @@ function paragraphToDocx(token: Tokens.Paragraph): Paragraph {
 
 function codeBlockToDocx(token: Tokens.Code): DocxElement[] {
   const lines = token.text.split('\n');
-  return lines.map(
-    (line: string) =>
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: line || ' ',
-            font: { name: 'Courier New' },
-            size: 18,
-            color: '333333',
-          }),
-        ],
-        shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'F4F4F4' },
-        spacing: { before: 0, after: 0, line: 240 },
-        indent: { left: 360 },
+
+  // Build one paragraph with all lines joined by explicit line-breaks.
+  // A single paragraph with four-sided borders renders as a cohesive code block.
+  const runs: TextRun[] = [];
+  lines.forEach((line, i) => {
+    runs.push(
+      new TextRun({
+        text: line || '\u00A0', // non-breaking space keeps empty lines visible
+        font: { name: 'Courier New' },
+        size: 18,
+        color: '333333',
       })
-  );
+    );
+    if (i < lines.length - 1) {
+      runs.push(new TextRun({ break: 1 }));
+    }
+  });
+
+  return [
+    new Paragraph({
+      children: runs,
+      shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'F4F4F4' },
+      border: {
+        top:    { style: BorderStyle.SINGLE, size: 4,  color: 'D1D5DB', space: 4 },
+        bottom: { style: BorderStyle.SINGLE, size: 4,  color: 'D1D5DB', space: 4 },
+        left:   { style: BorderStyle.THICK,  size: 16, color: '6366F1', space: 6 },
+        right:  { style: BorderStyle.SINGLE, size: 4,  color: 'D1D5DB', space: 4 },
+      },
+      spacing: { before: 160, after: 160, line: 260 },
+      indent: { left: 240, right: 240 },
+    }),
+  ];
 }
 
 function blockquoteToDocx(token: Tokens.Blockquote): DocxElement[] {

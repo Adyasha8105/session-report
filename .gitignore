@@ -4,3 +4,4 @@ dist/*.map
 .env.local
 *.log
 .DS_Store
+out*/

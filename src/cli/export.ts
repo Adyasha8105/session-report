@@ -27,6 +27,7 @@ export function createExportCommand(): Command {
     .option('--include-thinking', 'Include thinking blocks')
     .option('--include-timestamps', 'Prefix events with timestamps')
     .option('--max-tool-lines <n>', 'Max lines of tool output to include', '50')
+    .option('--max-message-lines <n>', 'Truncate each message after N lines, 0 = unlimited (default: 0)', '0')
     .option('--no-housekeeping', 'Exclude sessions with no assistant output')
     .option('--claude-root <path>', 'Override ~/.claude directory')
     .option('--codex-root <path>', 'Override ~/.codex directory')
@@ -54,6 +55,7 @@ export function createExportCommand(): Command {
         includeThinking: Boolean(opts.includeThinking),
         includeTimestamps: Boolean(opts.includeTimestamps),
         maxToolOutputLines: parseInt(opts.maxToolLines, 10) || 50,
+        maxMessageLines: parseInt(opts.maxMessageLines, 10) || 0,
       };
 
       const spinner = ora('Scanning sessions…').start();
