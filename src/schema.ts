@@ -1,6 +1,6 @@
 // ---- Core enums / types ----
 
-export type Provider = 'claude' | 'codex' | 'cursor';
+export type Provider = 'claude' | 'codex' | 'cursor' | 'gemini' | 'opencode' | 'copilot';
 
 export type EventKind =
   | 'user'

@@ -7,6 +7,9 @@ import type { DiscoveryError as IDiscoveryError } from './schema.js';
 import { ClaudeAdapter } from './providers/claude.js';
 import { CodexAdapter } from './providers/codex.js';
 import { CursorAdapter } from './providers/cursor.js';
+import { GeminiAdapter } from './providers/gemini.js';
+import { OpenCodeAdapter } from './providers/opencode.js';
+import { CopilotAdapter } from './providers/copilot.js';
 import { detectGitContext } from './git.js';
 import { filterSessions } from './normalize.js';
 import { expandTilde } from './util/paths.js';
@@ -16,6 +19,9 @@ export interface DiscoveryConfig {
   claudeRoot?: string;
   codexRoot?: string;
   cursorRoot?: string;
+  geminiRoot?: string;
+  openCodeRoot?: string;
+  copilotRoot?: string;
   filter?: FilterOptions;
 }
 
@@ -29,9 +35,12 @@ const SCAN_CONCURRENCY = 8;
 const claudeAdapter = new ClaudeAdapter();
 const codexAdapter = new CodexAdapter();
 const cursorAdapter = new CursorAdapter();
+const geminiAdapter = new GeminiAdapter();
+const openCodeAdapter = new OpenCodeAdapter();
+const copilotAdapter = new CopilotAdapter();
 
 export async function discoverSessions(config: DiscoveryConfig = {}): Promise<DiscoveryResult> {
-  const providers = config.providers ?? ['claude', 'codex', 'cursor'];
+  const providers = config.providers ?? ['claude', 'codex', 'cursor', 'gemini', 'opencode', 'copilot'];
   const errors: IDiscoveryError[] = [];
   const allFiles: Array<{ filePath: string; provider: Provider }> = [];
 
@@ -39,6 +48,9 @@ export async function discoverSessions(config: DiscoveryConfig = {}): Promise<Di
   const claudeRoot = expandTilde(config.claudeRoot ?? '~/.claude');
   const codexRoot = expandTilde(config.codexRoot ?? '~/.codex');
   const cursorRoot = expandTilde(config.cursorRoot ?? '~/.cursor');
+  const geminiRoot = expandTilde(config.geminiRoot ?? '~/.gemini');
+  const openCodeRoot = expandTilde(config.openCodeRoot ?? '~/.local/share/opencode');
+  const copilotRoot = expandTilde(config.copilotRoot ?? '~/.copilot');
 
   if (providers.includes('claude') && existsSync(claudeRoot)) {
     const patterns = [
@@ -70,6 +82,24 @@ export async function discoverSessions(config: DiscoveryConfig = {}): Promise<Di
     }
   }
 
+  if (providers.includes('gemini') && existsSync(geminiRoot)) {
+    const files = await fg([`${geminiRoot}/tmp/**/session-*.json`], { onlyFiles: true, absolute: true, suppressErrors: true });
+    for (const f of files) allFiles.push({ filePath: f, provider: 'gemini' });
+  }
+
+  if (providers.includes('opencode') && existsSync(openCodeRoot)) {
+    const files = await fg([`${openCodeRoot}/storage/session/**/*.json`], { onlyFiles: true, absolute: true, suppressErrors: true });
+    for (const f of files) allFiles.push({ filePath: f, provider: 'opencode' });
+  }
+
+  if (providers.includes('copilot') && existsSync(copilotRoot)) {
+    const files = await fg([
+      `${copilotRoot}/session-state/**/events.jsonl`,
+      `${copilotRoot}/session-state/*.jsonl`,
+    ], { onlyFiles: true, absolute: true, suppressErrors: true });
+    for (const f of files) allFiles.push({ filePath: f, provider: 'copilot' });
+  }
+
   // Sort by file mtime descending (most recent first)
   const filesWithStat = allFiles
     .map(({ filePath, provider }) => {
@@ -95,6 +125,12 @@ export async function discoverSessions(config: DiscoveryConfig = {}): Promise<Di
             session = await claudeAdapter.scanFile(filePath);
           } else if (provider === 'codex') {
             session = await codexAdapter.scanFile(filePath);
+          } else if (provider === 'gemini') {
+            session = await geminiAdapter.scanFile(filePath);
+          } else if (provider === 'opencode') {
+            session = await openCodeAdapter.scanFile(filePath);
+          } else if (provider === 'copilot') {
+            session = await copilotAdapter.scanFile(filePath);
           } else {
             session = await cursorAdapter.scanFile(filePath);
           }
@@ -154,6 +190,12 @@ export async function parseSessions(
             parsed = await claudeAdapter.parseFile(s.filePath);
           } else if (s.provider === 'codex') {
             parsed = await codexAdapter.parseFile(s.filePath);
+          } else if (s.provider === 'gemini') {
+            parsed = await geminiAdapter.parseFile(s.filePath);
+          } else if (s.provider === 'opencode') {
+            parsed = await openCodeAdapter.parseFile(s.filePath);
+          } else if (s.provider === 'copilot') {
+            parsed = await copilotAdapter.parseFile(s.filePath);
           } else {
             parsed = await cursorAdapter.parseFile(s.filePath);
           }

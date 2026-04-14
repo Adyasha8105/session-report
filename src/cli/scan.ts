@@ -7,13 +7,16 @@ import { discoverSessions } from '../discovery.js';
 export function createScanCommand(): Command {
   return new Command('scan')
     .description('Scan and list detected AI session providers and counts')
-    .option('-p, --provider <provider...>', 'Filter by provider: claude, codex, cursor')
+    .option('-p, --provider <provider...>', 'Filter by provider: claude, codex, cursor, gemini, opencode, copilot')
     .option('--since <date>', 'Only sessions after this date (ISO 8601)')
     .option('--until <date>', 'Only sessions before this date (ISO 8601)')
     .option('--json', 'Output raw JSON')
     .option('--claude-root <path>', 'Override ~/.claude directory')
     .option('--codex-root <path>', 'Override ~/.codex directory')
     .option('--cursor-root <path>', 'Override ~/.cursor directory')
+    .option('--gemini-root <path>', 'Override ~/.gemini directory')
+    .option('--opencode-root <path>', 'Override ~/.local/share/opencode directory')
+    .option('--copilot-root <path>', 'Override ~/.copilot directory')
     .action(async (opts) => {
       const spinner = ora('Scanning sessions…').start();
 
@@ -23,6 +26,9 @@ export function createScanCommand(): Command {
           claudeRoot: opts.claudeRoot,
           codexRoot: opts.codexRoot,
           cursorRoot: opts.cursorRoot,
+          geminiRoot: opts.geminiRoot,
+          openCodeRoot: opts.openCodeRoot,
+          copilotRoot: opts.copilotRoot,
           filter: {
             since: opts.since ? new Date(opts.since) : undefined,
             until: opts.until ? new Date(opts.until) : undefined,

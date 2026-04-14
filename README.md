@@ -3,7 +3,7 @@
 Hit a rate limit? Switch tools without losing context.
 Need to share your work? Export everything into one document.
 
-`session-report` reads your AI coding sessions from **Claude Code**, **Codex CLI**, and **Cursor** and exports them as PDF or DOCX — across any number of sessions, tools, or Git worktrees.
+`session-report` reads your AI coding sessions from **Claude Code**, **Codex CLI**, **Cursor**, **Gemini CLI**, **OpenCode**, and **GitHub Copilot** and exports them as PDF or DOCX — across any number of sessions, tools, or Git worktrees.
 
 ## What it solves
 
@@ -71,6 +71,9 @@ session-report export --worktree --format pdf
 ```bash
 session-report export --provider claude --format pdf
 session-report export --provider codex --format docx
+session-report export --provider gemini --format pdf
+session-report export --provider opencode --format pdf
+session-report export --provider copilot --format docx
 ```
 
 ### One file per session
@@ -99,7 +102,7 @@ session-report export --since 2026-04-01 --format pdf
 
 | Flag | Description |
 |---|---|
-| `-p, --provider <provider...>` | Filter by provider: `claude`, `codex`, `cursor` |
+| `-p, --provider <provider...>` | Filter by provider: `claude`, `codex`, `cursor`, `gemini`, `opencode`, `copilot` |
 | `--repo <name>` | Substring match on repository name |
 | `--worktree` | Only include worktree sessions |
 | `--session <id>` | Filter by session ID prefix |
@@ -136,6 +139,9 @@ session-report export --since 2026-04-01 --format pdf
 | Codex CLI | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` |
 | Cursor | `~/.cursor/projects/*/agent-transcripts/**/*.jsonl` |
 | Cursor (chat DB) | `~/.cursor/chats/**/store.db` |
+| Gemini CLI | `~/.gemini/tmp/**/session-*.json` |
+| OpenCode | `~/.local/share/opencode/storage/session/**/*.json` |
+| GitHub Copilot | `~/.copilot/session-state/**/*.jsonl` |
 
 ## Requirements
 

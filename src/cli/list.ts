@@ -7,7 +7,7 @@ import { discoverSessions } from '../discovery.js';
 export function createListCommand(): Command {
   return new Command('list')
     .description('List sessions with optional filters')
-    .option('-p, --provider <provider...>', 'Filter by provider: claude, codex, cursor')
+    .option('-p, --provider <provider...>', 'Filter by provider: claude, codex, cursor, gemini, opencode, copilot')
     .option('--repo <name>', 'Substring match on git repository name')
     .option('--worktree', 'Only show worktree sessions')
     .option('--session <id>', 'Filter by session ID prefix')
@@ -19,6 +19,9 @@ export function createListCommand(): Command {
     .option('--claude-root <path>', 'Override ~/.claude directory')
     .option('--codex-root <path>', 'Override ~/.codex directory')
     .option('--cursor-root <path>', 'Override ~/.cursor directory')
+    .option('--gemini-root <path>', 'Override ~/.gemini directory')
+    .option('--opencode-root <path>', 'Override ~/.local/share/opencode directory')
+    .option('--copilot-root <path>', 'Override ~/.copilot directory')
     .action(async (opts) => {
       const spinner = ora('Scanning sessions…').start();
 
@@ -28,6 +31,9 @@ export function createListCommand(): Command {
           claudeRoot: opts.claudeRoot,
           codexRoot: opts.codexRoot,
           cursorRoot: opts.cursorRoot,
+          geminiRoot: opts.geminiRoot,
+          openCodeRoot: opts.openCodeRoot,
+          copilotRoot: opts.copilotRoot,
           filter: {
             provider: opts.provider as Provider[] | undefined,
             repo: opts.repo,

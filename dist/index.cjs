@@ -8055,8 +8055,8 @@ var require_pattern = __commonJS({
     }
     exports2.endsWithSlashGlobStar = endsWithSlashGlobStar;
     function isAffectDepthOfReadingPattern(pattern) {
-      const basename3 = path.basename(pattern);
-      return endsWithSlashGlobStar(pattern) || isStaticPattern(basename3);
+      const basename4 = path.basename(pattern);
+      return endsWithSlashGlobStar(pattern) || isStaticPattern(basename4);
     }
     exports2.isAffectDepthOfReadingPattern = isAffectDepthOfReadingPattern;
     function expandPatternsWithBraceExpansion(patterns) {
@@ -8530,11 +8530,11 @@ var require_out = __commonJS({
       async.read(path, getSettings(optionsOrSettingsOrCallback), callback);
     }
     exports2.stat = stat;
-    function statSync6(path, optionsOrSettings) {
+    function statSync9(path, optionsOrSettings) {
       const settings = getSettings(optionsOrSettings);
       return sync.read(path, settings);
     }
-    exports2.statSync = statSync6;
+    exports2.statSync = statSync9;
     function getSettings(settingsOrOptions = {}) {
       if (settingsOrOptions instanceof settings_1.default) {
         return settingsOrOptions;
@@ -63623,7 +63623,7 @@ function ora(options2) {
 }
 
 // src/discovery.ts
-var import_fs6 = require("fs");
+var import_fs9 = require("fs");
 var import_fast_glob = __toESM(require_out4(), 1);
 
 // node_modules/yocto-queue/index.js
@@ -63889,9 +63889,10 @@ function coalesceEvents(events2) {
   let pending = null;
   for (const ev of events2) {
     if (ev.kind === "assistant" && ev.messageId && pending && pending.kind === "assistant" && pending.messageId === ev.messageId) {
+      const prev = pending;
       pending = {
-        ...pending,
-        text: [pending.text, ev.text].filter(Boolean).join(""),
+        ...prev,
+        text: [prev.text, ev.text].filter(Boolean).join(""),
         isDelta: false
       };
     } else {
@@ -63968,7 +63969,7 @@ var ClaudeAdapter = class {
         if (!firstTimestamp && rec.timestamp) {
           firstTimestamp = safeDate(rec.timestamp);
         }
-        if (!model && rec.message?.model) model = rec.message.model;
+        if (rec.message?.model) model = rec.message.model;
         if (!model && rec.version) model = `claude-code@${rec.version}`;
         if (!title && rec.type === "summary") {
           title = rec.summary ?? rec.title ?? null;
@@ -64017,7 +64018,7 @@ var ClaudeAdapter = class {
         if (!sessionId && rec.sessionId) sessionId = rec.sessionId;
         if (!cwd && rec.cwd) cwd = rec.cwd;
         if (!gitBranch && rec.gitBranch) gitBranch = rec.gitBranch;
-        if (!model && rec.message?.model) model = rec.message.model;
+        if (rec.message?.model) model = rec.message.model;
         if (!model && rec.version) model = `claude-code@${rec.version}`;
         if (!firstTimestamp && rec.timestamp) firstTimestamp = safeDate(rec.timestamp);
         if (!title && rec.type === "summary") {
@@ -64670,7 +64671,7 @@ function parseCursorRecord(rec, sessionId) {
   return events2;
 }
 function stripCursorTags(text) {
-  return text.replace(/<[^>]+>[\s\S]*?<\/[^>]+>/g, "").replace(/<[^>]+>/g, "").trim();
+  return text.replace(/<(user_query|cwd|context)[^>]*>([\s\S]*?)<\/\1>/gi, "$2").replace(/<[^>]+>/g, "").trim();
 }
 function extractCursorText(rec) {
   if (typeof rec.content === "string") return stripCursorTags(rec.content);
@@ -64746,9 +64747,550 @@ function generateId3(seed) {
   return (0, import_crypto3.createHash)("sha1").update(seed).digest("hex").slice(0, 16);
 }
 
-// src/git.ts
+// src/providers/gemini.ts
 var import_fs5 = require("fs");
+var import_crypto4 = require("crypto");
+var import_promises = require("fs/promises");
+var RAW_JSON_CAP4 = 8192;
+var GeminiAdapter = class {
+  provider = "gemini";
+  async scanFile(filePath) {
+    try {
+      const stat = (0, import_fs5.statSync)(filePath);
+      const raw = await (0, import_promises.readFile)(filePath, "utf8");
+      const data = parseGeminiJson(raw);
+      const messages = extractMessages(data);
+      const firstUser = messages.find(
+        (m) => normalizeEventKind(m.type, m.role) === "user"
+      );
+      const title = extractTextFromMessage2(firstUser)?.slice(0, 120) ?? null;
+      return {
+        id: data.sessionId ?? fileHash2(filePath),
+        provider: "gemini",
+        filePath,
+        title,
+        model: data.model ?? null,
+        startTime: safeDate3(data.startTime),
+        endTime: new Date(stat.mtimeMs),
+        cwd: null,
+        git: null,
+        events: [],
+        eventCount: messages.length,
+        fileSizeBytes: stat.size,
+        isHousekeeping: false,
+        isFullyParsed: false
+      };
+    } catch (err) {
+      throw new ParseError(filePath, "gemini", err instanceof Error ? err : void 0);
+    }
+  }
+  async parseFile(filePath) {
+    try {
+      const stat = (0, import_fs5.statSync)(filePath);
+      const raw = await (0, import_promises.readFile)(filePath, "utf8");
+      const data = parseGeminiJson(raw);
+      const messages = extractMessages(data);
+      const events2 = [];
+      for (const msg of messages) {
+        const evs = parseGeminiMessage(msg);
+        events2.push(...evs);
+      }
+      return {
+        id: data.sessionId ?? fileHash2(filePath),
+        provider: "gemini",
+        filePath,
+        title: extractTitle(events2),
+        model: data.model ?? null,
+        startTime: safeDate3(data.startTime),
+        endTime: new Date(stat.mtimeMs),
+        cwd: null,
+        git: null,
+        events: events2,
+        eventCount: events2.filter((e) => e.kind !== "meta").length,
+        fileSizeBytes: stat.size,
+        isHousekeeping: isHousekeepingSession(events2),
+        isFullyParsed: true
+      };
+    } catch (err) {
+      throw new ParseError(filePath, "gemini", err instanceof Error ? err : void 0);
+    }
+  }
+};
+function parseGeminiJson(raw) {
+  const parsed = JSON.parse(raw);
+  if (Array.isArray(parsed)) {
+    return { messages: parsed };
+  }
+  return parsed;
+}
+function extractMessages(data) {
+  return data.messages ?? data.history ?? [];
+}
+function parseGeminiMessage(msg) {
+  const events2 = [];
+  const kind = normalizeEventKind(msg.type, msg.role);
+  const ts = safeDate3(msg.timestamp ?? msg.ts ?? msg.created_at ?? msg.time);
+  const raw = capBytes(JSON.stringify(msg), RAW_JSON_CAP4);
+  if (kind === "tool_call") {
+    const inputStr = msg.input !== void 0 ? capBytes(JSON.stringify(msg.input ?? msg.arguments), RAW_JSON_CAP4) : null;
+    events2.push(makeEvent4({
+      id: msg.id ?? msg.uuid ?? generateId4(raw),
+      kind: "tool_call",
+      timestamp: ts,
+      role: "assistant",
+      toolName: msg.tool ?? msg.name ?? null,
+      toolInput: inputStr,
+      messageId: msg.id ?? null,
+      parentId: msg.parentId ?? null,
+      rawJson: raw
+    }));
+    return events2;
+  }
+  if (kind === "tool_result") {
+    const outputStr = msg.output !== void 0 ? capBytes(redactBase64Images(JSON.stringify(msg.output)), RAW_JSON_CAP4) : null;
+    events2.push(makeEvent4({
+      id: msg.id ?? msg.uuid ?? generateId4(raw),
+      kind: "tool_result",
+      timestamp: ts,
+      role: "tool",
+      toolOutput: outputStr,
+      messageId: msg.id ?? null,
+      parentId: msg.parentId ?? null,
+      rawJson: raw
+    }));
+    return events2;
+  }
+  const text = extractTextFromMessage2(msg);
+  if (!text && kind === "meta") return [];
+  events2.push(makeEvent4({
+    id: msg.id ?? msg.uuid ?? generateId4(raw),
+    kind,
+    timestamp: ts,
+    role: msg.role ?? msg.type ?? null,
+    text,
+    messageId: msg.id ?? null,
+    parentId: msg.parentId ?? null,
+    rawJson: raw
+  }));
+  return events2;
+}
+function extractTextFromMessage2(msg) {
+  if (!msg) return null;
+  if (msg.text) return msg.text;
+  if (typeof msg.content === "string") return msg.content;
+  if (Array.isArray(msg.content)) {
+    return msg.content.map((p) => p.text ?? "").filter(Boolean).join("") || null;
+  }
+  if (Array.isArray(msg.parts)) {
+    return msg.parts.map((p) => p.text ?? "").filter(Boolean).join("") || null;
+  }
+  return null;
+}
+function makeEvent4(partial) {
+  return {
+    id: partial.id,
+    kind: partial.kind,
+    timestamp: partial.timestamp ?? null,
+    role: partial.role ?? null,
+    text: partial.text ?? null,
+    toolName: partial.toolName ?? null,
+    toolInput: partial.toolInput ?? null,
+    toolOutput: partial.toolOutput ?? null,
+    messageId: partial.messageId ?? null,
+    parentId: partial.parentId ?? null,
+    isDelta: false,
+    rawJson: partial.rawJson ?? null
+  };
+}
+function safeDate3(v) {
+  if (v === void 0 || v === null) return null;
+  try {
+    const d = typeof v === "number" ? new Date(v) : new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+}
+function fileHash2(filePath) {
+  return (0, import_crypto4.createHash)("sha1").update(filePath).digest("hex").slice(0, 16);
+}
+function generateId4(seed) {
+  return (0, import_crypto4.createHash)("sha1").update(seed).digest("hex").slice(0, 16);
+}
+
+// src/providers/opencode.ts
+var import_fs6 = require("fs");
 var import_path2 = require("path");
+var import_crypto5 = require("crypto");
+var import_promises2 = require("fs/promises");
+var RAW_JSON_CAP5 = 8192;
+var STORAGE_ROOT = "~/.local/share/opencode/storage";
+var OpenCodeAdapter = class {
+  provider = "opencode";
+  async scanFile(filePath) {
+    try {
+      const stat = (0, import_fs6.statSync)(filePath);
+      const raw = await (0, import_promises2.readFile)(filePath, "utf8");
+      const data = JSON.parse(raw);
+      return {
+        id: data.id ?? fileHash3(filePath),
+        provider: "opencode",
+        filePath,
+        title: data.title ?? null,
+        model: null,
+        startTime: data.time?.created ? new Date(data.time.created) : null,
+        endTime: data.time?.updated ? new Date(data.time.updated) : new Date(stat.mtimeMs),
+        cwd: data.directory ?? null,
+        git: null,
+        events: [],
+        eventCount: 0,
+        fileSizeBytes: stat.size,
+        isHousekeeping: false,
+        isFullyParsed: false
+      };
+    } catch (err) {
+      throw new ParseError(filePath, "opencode", err instanceof Error ? err : void 0);
+    }
+  }
+  async parseFile(filePath) {
+    try {
+      const stat = (0, import_fs6.statSync)(filePath);
+      const raw = await (0, import_promises2.readFile)(filePath, "utf8");
+      const data = JSON.parse(raw);
+      const sessionId = data.id ?? fileHash3(filePath);
+      const events2 = [];
+      let model = null;
+      const storageRoot = expandTilde(STORAGE_ROOT);
+      const msgDir = (0, import_path2.join)(storageRoot, "message", sessionId);
+      if ((0, import_fs6.existsSync)(msgDir)) {
+        const msgFiles = (0, import_fs6.readdirSync)(msgDir).filter((f) => f.startsWith("msg_") && f.endsWith(".json")).sort();
+        for (const msgFile of msgFiles) {
+          const msgPath = (0, import_path2.join)(msgDir, msgFile);
+          try {
+            const msgRaw = await (0, import_promises2.readFile)(msgPath, "utf8");
+            const msg = JSON.parse(msgRaw);
+            if (!model && msg.model?.modelID) {
+              model = `${msg.model.providerID ?? ""}/${msg.model.modelID}`.replace(/^\//, "");
+            }
+            const kind = normalizeEventKind(void 0, msg.role);
+            const ts = msg.time?.created ? new Date(msg.time.created) : null;
+            const msgId = msg.id ?? fileHash3(msgPath);
+            const parts = await loadParts(storageRoot, msgId);
+            if (parts.length > 0) {
+              for (const part of parts) {
+                const ev = partToEvent(part, kind, ts, msgId);
+                if (ev) events2.push(ev);
+              }
+            } else {
+              if (kind !== "meta") {
+                events2.push(makeEvent5({
+                  id: msgId,
+                  kind,
+                  timestamp: ts,
+                  role: msg.role ?? null,
+                  messageId: msgId
+                }));
+              }
+            }
+          } catch {
+          }
+        }
+      }
+      return {
+        id: sessionId,
+        provider: "opencode",
+        filePath,
+        title: data.title ?? extractTitle(events2),
+        model,
+        startTime: data.time?.created ? new Date(data.time.created) : null,
+        endTime: data.time?.updated ? new Date(data.time.updated) : new Date(stat.mtimeMs),
+        cwd: data.directory ?? null,
+        git: null,
+        events: events2,
+        eventCount: events2.filter((e) => e.kind !== "meta").length,
+        fileSizeBytes: stat.size,
+        isHousekeeping: isHousekeepingSession(events2),
+        isFullyParsed: true
+      };
+    } catch (err) {
+      throw new ParseError(filePath, "opencode", err instanceof Error ? err : void 0);
+    }
+  }
+};
+async function loadParts(storageRoot, messageId) {
+  const parts = [];
+  const partDir = (0, import_path2.join)(storageRoot, "part", messageId);
+  if ((0, import_fs6.existsSync)(partDir)) {
+    const files = (0, import_fs6.readdirSync)(partDir).filter((f) => f.endsWith(".json")).sort();
+    for (const f of files) {
+      try {
+        const raw = await (0, import_promises2.readFile)((0, import_path2.join)(partDir, f), "utf8");
+        parts.push(JSON.parse(raw));
+      } catch {
+      }
+    }
+  }
+  return parts;
+}
+function partToEvent(part, parentKind, ts, messageId) {
+  const partType = part.type ?? "";
+  if (partType === "text" && part.text) {
+    return makeEvent5({
+      id: generateId5(part.text + messageId),
+      kind: parentKind,
+      timestamp: ts,
+      text: part.text,
+      messageId
+    });
+  }
+  if (partType === "tool-invocation" || partType === "tool_use") {
+    const inputStr = part.input !== void 0 ? capBytes(JSON.stringify(part.input), RAW_JSON_CAP5) : null;
+    return makeEvent5({
+      id: generateId5((part.name ?? "") + messageId),
+      kind: "tool_call",
+      timestamp: ts,
+      role: "assistant",
+      toolName: part.tool ?? part.name ?? null,
+      toolInput: inputStr,
+      messageId
+    });
+  }
+  if (partType === "tool-result" || partType === "tool_result") {
+    const outputStr = part.output !== void 0 ? capBytes(redactBase64Images(JSON.stringify(part.output)), RAW_JSON_CAP5) : null;
+    return makeEvent5({
+      id: generateId5((part.tool ?? "") + messageId + "result"),
+      kind: "tool_result",
+      timestamp: ts,
+      role: "tool",
+      toolOutput: outputStr,
+      messageId
+    });
+  }
+  return null;
+}
+function makeEvent5(partial) {
+  return {
+    id: partial.id,
+    kind: partial.kind,
+    timestamp: partial.timestamp ?? null,
+    role: partial.role ?? null,
+    text: partial.text ?? null,
+    toolName: partial.toolName ?? null,
+    toolInput: partial.toolInput ?? null,
+    toolOutput: partial.toolOutput ?? null,
+    messageId: partial.messageId ?? null,
+    parentId: partial.parentId ?? null,
+    isDelta: false,
+    rawJson: partial.rawJson ?? null
+  };
+}
+function fileHash3(filePath) {
+  return (0, import_crypto5.createHash)("sha1").update(filePath).digest("hex").slice(0, 16);
+}
+function generateId5(seed) {
+  return (0, import_crypto5.createHash)("sha1").update(seed).digest("hex").slice(0, 16);
+}
+
+// src/providers/copilot.ts
+var import_fs7 = require("fs");
+var import_crypto6 = require("crypto");
+var RAW_JSON_CAP6 = 8192;
+var CopilotAdapter = class {
+  provider = "copilot";
+  async scanFile(filePath) {
+    try {
+      const stat = (0, import_fs7.statSync)(filePath);
+      let sessionId = null;
+      let model = null;
+      let cwd = null;
+      let firstUserText = null;
+      let startTime = null;
+      for await (const raw of readJsonlFile(filePath, { maxLines: 50 })) {
+        const ev = raw;
+        if (ev.type === "session.start") {
+          sessionId = ev.data?.sessionId ?? null;
+          cwd = ev.data?.workspacePath ?? null;
+        } else if (ev.type === "session.model_change" && !model) {
+          model = ev.data?.model ?? null;
+        } else if (ev.type === "user.message" && !firstUserText) {
+          firstUserText = ev.data?.text ?? null;
+          if (ev.data?.timestamp) {
+            startTime = safeDate4(ev.data.timestamp);
+          }
+        }
+        if (sessionId && model && firstUserText) break;
+      }
+      return {
+        id: sessionId ?? fileHash4(filePath),
+        provider: "copilot",
+        filePath,
+        title: firstUserText ? firstUserText.slice(0, 120) : null,
+        model,
+        startTime,
+        endTime: new Date(stat.mtimeMs),
+        cwd,
+        git: null,
+        events: [],
+        eventCount: 0,
+        fileSizeBytes: stat.size,
+        isHousekeeping: false,
+        isFullyParsed: false
+      };
+    } catch (err) {
+      throw new ParseError(filePath, "copilot", err instanceof Error ? err : void 0);
+    }
+  }
+  async parseFile(filePath) {
+    try {
+      const stat = (0, import_fs7.statSync)(filePath);
+      let sessionId = null;
+      let model = null;
+      let cwd = null;
+      let startTime = null;
+      const events2 = [];
+      const toolNameMap = /* @__PURE__ */ new Map();
+      for await (const raw of readJsonlFile(filePath)) {
+        const ev = raw;
+        const evType = ev.type ?? "";
+        const data = ev.data ?? {};
+        if (evType === "session.start") {
+          sessionId = data.sessionId ?? null;
+          cwd = data.workspacePath ?? null;
+          continue;
+        }
+        if (evType === "session.model_change") {
+          if (data.model) model = data.model;
+          continue;
+        }
+        const ts = data.timestamp ? safeDate4(data.timestamp) : null;
+        if (evType === "user.message") {
+          if (!startTime && ts) startTime = ts;
+          if (data.text) {
+            events2.push(makeEvent6({
+              id: generateId6(data.text + events2.length),
+              kind: "user",
+              timestamp: ts,
+              role: "user",
+              text: data.text
+            }));
+          }
+          continue;
+        }
+        if (evType === "assistant.message") {
+          if (data.text) {
+            events2.push(makeEvent6({
+              id: generateId6(data.text + events2.length),
+              kind: "assistant",
+              timestamp: ts,
+              role: "assistant",
+              text: data.text
+            }));
+          }
+          if (Array.isArray(data.toolRequests)) {
+            for (const req of data.toolRequests) {
+              if (req.toolCallId) toolNameMap.set(req.toolCallId, req.toolName ?? "");
+              const inputStr = req.input !== void 0 ? capBytes(JSON.stringify(req.input), RAW_JSON_CAP6) : null;
+              events2.push(makeEvent6({
+                id: generateId6((req.toolCallId ?? "") + events2.length),
+                kind: "tool_call",
+                timestamp: ts,
+                role: "assistant",
+                toolName: req.toolName ?? null,
+                toolInput: inputStr
+              }));
+            }
+          }
+          continue;
+        }
+        if (evType === "tool.execution_start") {
+          if (data.toolCallId && data.toolName) {
+            toolNameMap.set(data.toolCallId, data.toolName);
+          }
+          const inputStr = data.input !== void 0 ? capBytes(JSON.stringify(data.input), RAW_JSON_CAP6) : null;
+          events2.push(makeEvent6({
+            id: generateId6((data.toolCallId ?? "") + events2.length + "start"),
+            kind: "tool_call",
+            timestamp: ts,
+            role: "assistant",
+            toolName: data.toolName ?? null,
+            toolInput: inputStr
+          }));
+          continue;
+        }
+        if (evType === "tool.execution_complete") {
+          const resolvedName = data.toolName ?? (data.toolCallId ? toolNameMap.get(data.toolCallId) : null) ?? null;
+          let outputStr = null;
+          if (data.output !== void 0) {
+            const raw2 = typeof data.output === "string" ? data.output : JSON.stringify(data.output);
+            outputStr = capBytes(redactBase64Images(raw2), RAW_JSON_CAP6);
+          }
+          events2.push(makeEvent6({
+            id: generateId6((data.toolCallId ?? "") + events2.length + "complete"),
+            kind: "tool_result",
+            timestamp: ts,
+            role: "tool",
+            toolName: resolvedName,
+            toolOutput: outputStr
+          }));
+          continue;
+        }
+      }
+      return {
+        id: sessionId ?? fileHash4(filePath),
+        provider: "copilot",
+        filePath,
+        title: extractTitle(events2),
+        model,
+        startTime,
+        endTime: new Date(stat.mtimeMs),
+        cwd,
+        git: null,
+        events: events2,
+        eventCount: events2.filter((e) => e.kind !== "meta").length,
+        fileSizeBytes: stat.size,
+        isHousekeeping: isHousekeepingSession(events2),
+        isFullyParsed: true
+      };
+    } catch (err) {
+      throw new ParseError(filePath, "copilot", err instanceof Error ? err : void 0);
+    }
+  }
+};
+function makeEvent6(partial) {
+  return {
+    id: partial.id,
+    kind: partial.kind,
+    timestamp: partial.timestamp ?? null,
+    role: partial.role ?? null,
+    text: partial.text ?? null,
+    toolName: partial.toolName ?? null,
+    toolInput: partial.toolInput ?? null,
+    toolOutput: partial.toolOutput ?? null,
+    messageId: partial.messageId ?? null,
+    parentId: partial.parentId ?? null,
+    isDelta: false,
+    rawJson: partial.rawJson ?? null
+  };
+}
+function safeDate4(v) {
+  if (v === void 0 || v === null) return null;
+  try {
+    const d = typeof v === "number" ? new Date(v) : new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+}
+function fileHash4(filePath) {
+  return (0, import_crypto6.createHash)("sha1").update(filePath).digest("hex").slice(0, 16);
+}
+function generateId6(seed) {
+  return (0, import_crypto6.createHash)("sha1").update(seed).digest("hex").slice(0, 16);
+}
+
+// src/git.ts
+var import_fs8 = require("fs");
+var import_path3 = require("path");
 function detectGitContext(cwd) {
   if (!cwd) {
     return emptyContext();
@@ -64757,11 +65299,11 @@ function detectGitContext(cwd) {
   if (!repoRoot) {
     return emptyContext();
   }
-  const gitPath = (0, import_path2.join)(repoRoot, ".git");
+  const gitPath = (0, import_path3.join)(repoRoot, ".git");
   const isWorktree = isGitFile(gitPath);
   const worktreeRoot = isWorktree ? resolveWorktreeRoot(gitPath) : null;
   const branch = readBranch(repoRoot);
-  const repoName = (0, import_path2.basename)(worktreeRoot ?? repoRoot);
+  const repoName = (0, import_path3.basename)(worktreeRoot ?? repoRoot);
   return {
     repoRoot,
     repoName,
@@ -64782,37 +65324,37 @@ function emptyContext() {
 function findGitRoot(dir) {
   let current = dir;
   for (; ; ) {
-    const candidate = (0, import_path2.join)(current, ".git");
-    if ((0, import_fs5.existsSync)(candidate)) return current;
-    const parent = (0, import_path2.dirname)(current);
+    const candidate = (0, import_path3.join)(current, ".git");
+    if ((0, import_fs8.existsSync)(candidate)) return current;
+    const parent = (0, import_path3.dirname)(current);
     if (parent === current) return null;
     current = parent;
   }
 }
 function isGitFile(gitPath) {
   try {
-    return (0, import_fs5.statSync)(gitPath).isFile();
+    return (0, import_fs8.statSync)(gitPath).isFile();
   } catch {
     return false;
   }
 }
 function resolveWorktreeRoot(gitFilePath) {
   try {
-    const content = (0, import_fs5.readFileSync)(gitFilePath, "utf8").trim();
+    const content = (0, import_fs8.readFileSync)(gitFilePath, "utf8").trim();
     const match = content.match(/^gitdir:\s*(.+)$/m);
     if (!match || !match[1]) return null;
     const gitdirPath = match[1].trim();
-    const repoGitDir = (0, import_path2.dirname)((0, import_path2.dirname)(gitdirPath));
-    const repoRoot = (0, import_path2.dirname)(repoGitDir);
-    return (0, import_fs5.existsSync)(repoGitDir) ? repoRoot : null;
+    const repoGitDir = (0, import_path3.dirname)((0, import_path3.dirname)(gitdirPath));
+    const repoRoot = (0, import_path3.dirname)(repoGitDir);
+    return (0, import_fs8.existsSync)(repoGitDir) ? repoRoot : null;
   } catch {
     return null;
   }
 }
 function readBranch(repoRoot) {
   try {
-    const headPath = (0, import_path2.join)(repoRoot, ".git", "HEAD");
-    const content = (0, import_fs5.readFileSync)(headPath, "utf8").trim();
+    const headPath = (0, import_path3.join)(repoRoot, ".git", "HEAD");
+    const content = (0, import_fs8.readFileSync)(headPath, "utf8").trim();
     const refMatch = content.match(/^ref:\s*refs\/heads\/(.+)$/);
     if (refMatch && refMatch[1]) return refMatch[1];
     if (/^[0-9a-f]{40}$/i.test(content)) {
@@ -64829,14 +65371,20 @@ var SCAN_CONCURRENCY = 8;
 var claudeAdapter = new ClaudeAdapter();
 var codexAdapter = new CodexAdapter();
 var cursorAdapter = new CursorAdapter();
+var geminiAdapter = new GeminiAdapter();
+var openCodeAdapter = new OpenCodeAdapter();
+var copilotAdapter = new CopilotAdapter();
 async function discoverSessions(config = {}) {
-  const providers = config.providers ?? ["claude", "codex", "cursor"];
+  const providers = config.providers ?? ["claude", "codex", "cursor", "gemini", "opencode", "copilot"];
   const errors = [];
   const allFiles = [];
   const claudeRoot = expandTilde(config.claudeRoot ?? "~/.claude");
   const codexRoot = expandTilde(config.codexRoot ?? "~/.codex");
   const cursorRoot = expandTilde(config.cursorRoot ?? "~/.cursor");
-  if (providers.includes("claude") && (0, import_fs6.existsSync)(claudeRoot)) {
+  const geminiRoot = expandTilde(config.geminiRoot ?? "~/.gemini");
+  const openCodeRoot = expandTilde(config.openCodeRoot ?? "~/.local/share/opencode");
+  const copilotRoot = expandTilde(config.copilotRoot ?? "~/.copilot");
+  if (providers.includes("claude") && (0, import_fs9.existsSync)(claudeRoot)) {
     const patterns = [
       `${claudeRoot}/projects/**/*.jsonl`,
       `${claudeRoot}/projects/**/*.ndjson`
@@ -64846,14 +65394,14 @@ async function discoverSessions(config = {}) {
       allFiles.push({ filePath: f, provider: "claude" });
     }
   }
-  if (providers.includes("codex") && (0, import_fs6.existsSync)(codexRoot)) {
+  if (providers.includes("codex") && (0, import_fs9.existsSync)(codexRoot)) {
     const patterns = [`${codexRoot}/sessions/**/rollout-*.jsonl`];
     const files = await (0, import_fast_glob.default)(patterns, { onlyFiles: true, absolute: true, suppressErrors: true });
     for (const f of files) {
       allFiles.push({ filePath: f, provider: "codex" });
     }
   }
-  if (providers.includes("cursor") && (0, import_fs6.existsSync)(cursorRoot)) {
+  if (providers.includes("cursor") && (0, import_fs9.existsSync)(cursorRoot)) {
     const patterns = [
       `${cursorRoot}/projects/*/agent-transcripts/**/*.jsonl`,
       `${cursorRoot}/chats/**/store.db`
@@ -64863,9 +65411,24 @@ async function discoverSessions(config = {}) {
       allFiles.push({ filePath: f, provider: "cursor" });
     }
   }
+  if (providers.includes("gemini") && (0, import_fs9.existsSync)(geminiRoot)) {
+    const files = await (0, import_fast_glob.default)([`${geminiRoot}/tmp/**/session-*.json`], { onlyFiles: true, absolute: true, suppressErrors: true });
+    for (const f of files) allFiles.push({ filePath: f, provider: "gemini" });
+  }
+  if (providers.includes("opencode") && (0, import_fs9.existsSync)(openCodeRoot)) {
+    const files = await (0, import_fast_glob.default)([`${openCodeRoot}/storage/session/**/*.json`], { onlyFiles: true, absolute: true, suppressErrors: true });
+    for (const f of files) allFiles.push({ filePath: f, provider: "opencode" });
+  }
+  if (providers.includes("copilot") && (0, import_fs9.existsSync)(copilotRoot)) {
+    const files = await (0, import_fast_glob.default)([
+      `${copilotRoot}/session-state/**/events.jsonl`,
+      `${copilotRoot}/session-state/*.jsonl`
+    ], { onlyFiles: true, absolute: true, suppressErrors: true });
+    for (const f of files) allFiles.push({ filePath: f, provider: "copilot" });
+  }
   const filesWithStat = allFiles.map(({ filePath, provider }) => {
     try {
-      const mtime = (0, import_fs6.statSync)(filePath).mtimeMs;
+      const mtime = (0, import_fs9.statSync)(filePath).mtimeMs;
       return { filePath, provider, mtime };
     } catch {
       return { filePath, provider, mtime: 0 };
@@ -64882,6 +65445,12 @@ async function discoverSessions(config = {}) {
             session = await claudeAdapter.scanFile(filePath);
           } else if (provider === "codex") {
             session = await codexAdapter.scanFile(filePath);
+          } else if (provider === "gemini") {
+            session = await geminiAdapter.scanFile(filePath);
+          } else if (provider === "opencode") {
+            session = await openCodeAdapter.scanFile(filePath);
+          } else if (provider === "copilot") {
+            session = await copilotAdapter.scanFile(filePath);
           } else {
             session = await cursorAdapter.scanFile(filePath);
           }
@@ -64922,6 +65491,12 @@ async function parseSessions(sessions, config = {}) {
             parsed = await claudeAdapter.parseFile(s.filePath);
           } else if (s.provider === "codex") {
             parsed = await codexAdapter.parseFile(s.filePath);
+          } else if (s.provider === "gemini") {
+            parsed = await geminiAdapter.parseFile(s.filePath);
+          } else if (s.provider === "opencode") {
+            parsed = await openCodeAdapter.parseFile(s.filePath);
+          } else if (s.provider === "copilot") {
+            parsed = await copilotAdapter.parseFile(s.filePath);
           } else {
             parsed = await cursorAdapter.parseFile(s.filePath);
           }
@@ -64949,7 +65524,7 @@ async function parseSessions(sessions, config = {}) {
 
 // src/cli/scan.ts
 function createScanCommand() {
-  return new Command("scan").description("Scan and list detected AI session providers and counts").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--json", "Output raw JSON").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").action(async (opts) => {
+  return new Command("scan").description("Scan and list detected AI session providers and counts").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--json", "Output raw JSON").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
     const spinner = ora("Scanning sessions\u2026").start();
     try {
       const { sessions, errors } = await discoverSessions({
@@ -64957,6 +65532,9 @@ function createScanCommand() {
         claudeRoot: opts.claudeRoot,
         codexRoot: opts.codexRoot,
         cursorRoot: opts.cursorRoot,
+        geminiRoot: opts.geminiRoot,
+        openCodeRoot: opts.openCodeRoot,
+        copilotRoot: opts.copilotRoot,
         filter: {
           since: opts.since ? new Date(opts.since) : void 0,
           until: opts.until ? new Date(opts.until) : void 0
@@ -65027,7 +65605,7 @@ function formatBytes(bytes) {
 
 // src/cli/list.ts
 function createListCommand() {
-  return new Command("list").description("List sessions with optional filters").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor").option("--repo <name>", "Substring match on git repository name").option("--worktree", "Only show worktree sessions").option("--session <id>", "Filter by session ID prefix").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--limit <n>", "Maximum number of sessions to show", "50").option("--no-housekeeping", "Exclude sessions with no assistant output").option("--json", "Output raw JSON").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").action(async (opts) => {
+  return new Command("list").description("List sessions with optional filters").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--repo <name>", "Substring match on git repository name").option("--worktree", "Only show worktree sessions").option("--session <id>", "Filter by session ID prefix").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--limit <n>", "Maximum number of sessions to show", "50").option("--no-housekeeping", "Exclude sessions with no assistant output").option("--json", "Output raw JSON").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
     const spinner = ora("Scanning sessions\u2026").start();
     try {
       const { sessions, errors } = await discoverSessions({
@@ -65035,6 +65613,9 @@ function createListCommand() {
         claudeRoot: opts.claudeRoot,
         codexRoot: opts.codexRoot,
         cursorRoot: opts.cursorRoot,
+        geminiRoot: opts.geminiRoot,
+        openCodeRoot: opts.openCodeRoot,
+        copilotRoot: opts.copilotRoot,
         filter: {
           provider: opts.provider,
           repo: opts.repo,
@@ -65104,8 +65685,8 @@ function truncate(s, max2) {
 }
 
 // src/cli/export.ts
-var import_fs9 = require("fs");
-var import_path5 = require("path");
+var import_fs12 = require("fs");
+var import_path6 = require("path");
 
 // src/render/markdown.ts
 var DEFAULT_MARKDOWN_OPTIONS = {
@@ -65251,8 +65832,8 @@ function escapeMarkdown(s) {
 }
 
 // src/export/pdf.ts
-var import_fs7 = require("fs");
-var import_path3 = require("path");
+var import_fs10 = require("fs");
+var import_path4 = require("path");
 
 // node_modules/marked/lib/marked.esm.js
 function _getDefaults() {
@@ -67606,7 +68187,7 @@ async function exportToPdf(markdownContent, outputPath, options2 = {}) {
   const body = await marked.parse(markdownContent);
   const html2 = wrapInHtmlTemplate(body, options2.title ?? "Session Report");
   const { chromium } = await import("playwright");
-  (0, import_fs7.mkdirSync)((0, import_path3.dirname)(outputPath), { recursive: true });
+  (0, import_fs10.mkdirSync)((0, import_path4.dirname)(outputPath), { recursive: true });
   const browser2 = await chromium.launch({ headless: true });
   try {
     const page = await browser2.newPage();
@@ -67635,7 +68216,7 @@ var PdfExporter = class {
     if (!this.browser) throw new Error("PdfExporter not opened \u2014 call open() first");
     const body = await marked.parse(markdownContent);
     const html2 = wrapInHtmlTemplate(body, options2.title ?? "Session Report");
-    (0, import_fs7.mkdirSync)((0, import_path3.dirname)(outputPath), { recursive: true });
+    (0, import_fs10.mkdirSync)((0, import_path4.dirname)(outputPath), { recursive: true });
     const page = await this.browser.newPage();
     try {
       await page.setContent(html2, { waitUntil: "networkidle" });
@@ -67747,8 +68328,8 @@ function escapeHtml(s) {
 }
 
 // src/export/docx.ts
-var import_fs8 = require("fs");
-var import_path4 = require("path");
+var import_fs11 = require("fs");
+var import_path5 = require("path");
 
 // node_modules/docx/dist/index.mjs
 var __defProp2 = Object.defineProperty;
@@ -72427,7 +73008,7 @@ function requireBuffer_list() {
       }
     }, {
       key: "join",
-      value: function join3(s) {
+      value: function join4(s) {
         if (this.length === 0) return "";
         var p = this.head;
         var ret = "" + p.data;
@@ -87342,8 +87923,8 @@ async function exportToDocx(markdownContent, outputPath) {
     }
   });
   const buffer2 = await Packer.toBuffer(doc);
-  (0, import_fs8.mkdirSync)((0, import_path4.dirname)(outputPath), { recursive: true });
-  (0, import_fs8.writeFileSync)(outputPath, buffer2);
+  (0, import_fs11.mkdirSync)((0, import_path5.dirname)(outputPath), { recursive: true });
+  (0, import_fs11.writeFileSync)(outputPath, buffer2);
 }
 function tokensToDocxElements(tokens) {
   const elements = [];
@@ -87517,7 +88098,7 @@ function stripInlineMarkdown(s) {
 
 // src/cli/export.ts
 function createExportCommand() {
-  return new Command("export").description("Export sessions to PDF or DOCX").option("--format <format>", "Output format: pdf or docx", "pdf").option("--mode <mode>", "Export mode: single | combined | split-provider | split-repo", "combined").option("--output <dir>", "Output directory", "./session-reports").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor").option("--repo <name>", "Substring match on git repository name").option("--worktree", "Only include worktree sessions").option("--session <id>", "Export a single session by ID prefix").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-meta", "Include system/meta events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-tool-lines <n>", "Max lines of tool output to include", "50").option("--no-housekeeping", "Exclude sessions with no assistant output").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").action(async (opts) => {
+  return new Command("export").description("Export sessions to PDF or DOCX").option("--format <format>", "Output format: pdf or docx", "pdf").option("--mode <mode>", "Export mode: single | combined | split-provider | split-repo", "combined").option("--output <dir>", "Output directory", "./session-reports").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--repo <name>", "Substring match on git repository name").option("--worktree", "Only include worktree sessions").option("--session <id>", "Export a single session by ID prefix").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-meta", "Include system/meta events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-tool-lines <n>", "Max lines of tool output to include", "50").option("--no-housekeeping", "Exclude sessions with no assistant output").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
     const format = opts.format;
     const mode = opts.mode;
     if (!["pdf", "docx"].includes(format)) {
@@ -87543,6 +88124,9 @@ function createExportCommand() {
         claudeRoot: opts.claudeRoot,
         codexRoot: opts.codexRoot,
         cursorRoot: opts.cursorRoot,
+        geminiRoot: opts.geminiRoot,
+        openCodeRoot: opts.openCodeRoot,
+        copilotRoot: opts.copilotRoot,
         filter: {
           provider: opts.provider,
           repo: opts.repo,
@@ -87562,12 +88146,12 @@ function createExportCommand() {
       const { sessions, errors: parseErrors } = await parseSessions(discovered);
       const allErrors = [...scanErrors, ...parseErrors];
       spinner.text = "Rendering\u2026";
-      (0, import_fs9.mkdirSync)(opts.output, { recursive: true });
+      (0, import_fs12.mkdirSync)(opts.output, { recursive: true });
       const outputFiles = [];
       if (mode === "combined") {
         const md = sessionsToMarkdown(sessions, markdownOpts);
         const filename = `combined-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
-        const outPath = (0, import_path5.join)(opts.output, filename);
+        const outPath = (0, import_path6.join)(opts.output, filename);
         await exportDocument(md, outPath, format, "Session Report");
         outputFiles.push(outPath);
       } else if (mode === "single") {
@@ -87578,7 +88162,7 @@ function createExportCommand() {
             const title = session.title ?? "untitled";
             const slug = slugify(title);
             const filename = `${session.provider}-${session.id.slice(0, 8)}-${slug}.${format}`;
-            const outPath = (0, import_path5.join)(opts.output, filename);
+            const outPath = (0, import_path6.join)(opts.output, filename);
             const md = sessionToMarkdown(session, markdownOpts);
             if (exporter) {
               await exporter.exportPage(md, outPath, { title: session.title ?? void 0 });
@@ -87595,7 +88179,7 @@ function createExportCommand() {
         for (const [provider, group] of byProvider) {
           const md = sessionsToMarkdown(group, markdownOpts);
           const filename = `${provider}-sessions-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
-          const outPath = (0, import_path5.join)(opts.output, filename);
+          const outPath = (0, import_path6.join)(opts.output, filename);
           await exportDocument(md, outPath, format, `${provider} Sessions`);
           outputFiles.push(outPath);
         }
@@ -87605,7 +88189,7 @@ function createExportCommand() {
           const md = sessionsToMarkdown(group, markdownOpts);
           const slug = slugify(repo);
           const filename = `${slug}-sessions-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
-          const outPath = (0, import_path5.join)(opts.output, filename);
+          const outPath = (0, import_path6.join)(opts.output, filename);
           await exportDocument(md, outPath, format, `${repo} Sessions`);
           outputFiles.push(outPath);
         }
@@ -87647,7 +88231,7 @@ function groupBy(arr, key) {
 
 // src/cli/program.ts
 function createProgram() {
-  const program3 = new Command().name("session-report").description("Export AI coding assistant sessions (Claude Code, Codex CLI, Cursor) to PDF or DOCX").version("1.0.0");
+  const program3 = new Command().name("session-report").description("Export AI coding assistant sessions (Claude Code, Codex CLI, Cursor, Gemini CLI, OpenCode, GitHub Copilot) to PDF or DOCX").version("1.0.0");
   program3.addCommand(createScanCommand());
   program3.addCommand(createListCommand());
   program3.addCommand(createExportCommand());
