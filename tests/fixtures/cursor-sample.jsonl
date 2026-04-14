@@ -1,0 +1,4 @@
+{"role":"user","content":[{"type":"text","text":"<user_query>How do I add TypeScript support to this project?</user_query>"}]}
+{"role":"assistant","content":[{"type":"text","text":"To add TypeScript support to your project, you'll need to:\n\n1. Install TypeScript: `npm install -D typescript`\n2. Create a `tsconfig.json` file\n3. Rename `.js` files to `.ts`\n4. Update your build scripts"}]}
+{"role":"user","content":[{"type":"text","text":"<user_query>Can you create the tsconfig.json for me?</user_query>"}]}
+{"role":"assistant","content":[{"type":"tool_use","id":"t-001","name":"Write","input":{"file_path":"tsconfig.json","content":"{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"NodeNext\",\n    \"strict\": true\n  }\n}"}},{"type":"text","text":"I've created the `tsconfig.json` file with strict mode enabled."}]}
