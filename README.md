@@ -17,8 +17,8 @@ A command-line tool that aggregates AI coding assistant session histories from *
 ### Homebrew (recommended)
 
 ```bash
-brew tap Adyasha8105/session-report
-brew install session-report
+brew tap Adyasha8105/session-report https://github.com/Adyasha8105/session-report
+brew install Adyasha8105/session-report/session-report
 ```
 
 Then use it from any terminal:
