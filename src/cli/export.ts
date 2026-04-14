@@ -13,7 +13,7 @@ import { slugify, formatDate, parseDateArg } from '../util/paths.js';
 export function createExportCommand(): Command {
   return new Command('export')
     .description('Export sessions to PDF or DOCX')
-    .option('--format <format>', 'Output format: pdf or docx', 'pdf')
+    .option('--format <format>', 'Output format: pdf or docx', 'docx')
     .option('--mode <mode>', 'Export mode: single | combined | split-provider | split-repo', 'combined')
     .option('--output <dir>', 'Output directory', './session-reports')
     .option('-p, --provider <provider...>', 'Filter by provider: claude, codex, cursor, gemini, opencode, copilot')

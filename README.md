@@ -128,7 +128,7 @@ session-report export --since 2026-04-01 --format pdf
 
 | Flag | Description |
 |---|---|
-| `--format <format>` | `pdf` (default) or `docx` |
+| `--format <format>` | `docx` (default) or `pdf` |
 | `--mode <mode>` | `combined` (default), `single`, `split-provider`, `split-repo` |
 | `--output <dir>` | Output directory (default: `./session-reports`) |
 | `--include-tool-calls` | Include tool call/result events |
