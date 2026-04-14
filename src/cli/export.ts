@@ -27,6 +27,7 @@ export function createExportCommand(): Command {
     .option('--include-timestamps', 'Prefix events with timestamps')
     .option('--max-tool-lines <n>', 'Max lines of tool output to include', '50')
     .option('--max-message-lines <n>', 'Truncate each message after N lines, 0 = unlimited (default: 0)', '0')
+    .option('--last <n>', 'Number of most recent sessions to include')
     .option('--no-housekeeping', 'Exclude sessions with no assistant output')
     .option('--claude-root <path>', 'Override ~/.claude directory')
     .option('--codex-root <path>', 'Override ~/.codex directory')
@@ -87,10 +88,11 @@ export function createExportCommand(): Command {
           return;
         }
 
-        spinner.text = `Parsing ${discovered.length} session(s)…`;
+        const toExport = opts.last ? discovered.slice(0, Math.max(1, parseInt(opts.last, 10) || 1)) : discovered;
+        spinner.text = `Parsing ${toExport.length} session(s)…`;
 
         // Step 2: Full parse
-        const { sessions, errors: parseErrors } = await parseSessions(discovered);
+        const { sessions, errors: parseErrors } = await parseSessions(toExport);
         const allErrors = [...scanErrors, ...parseErrors];
 
         spinner.text = 'Rendering…';

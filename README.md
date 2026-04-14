@@ -91,6 +91,14 @@ session-report export --mode single --output ./sessions
 session-report export --mode single --format json --output ./sessions
 ```
 
+### Export the current (most recent) session
+
+```bash
+session-report export --last 1                           # most recent session, any provider
+session-report export --last 1 --provider claude         # most recent Claude session
+session-report export --last 3                           # last 3 sessions across all providers
+```
+
 ### Filter by date
 
 ```bash
@@ -136,6 +144,7 @@ session-report export --since 2026-04-01 --format json
 
 | Flag | Description |
 |---|---|
+| `--last <n>` | Number of most recent sessions to include |
 | `--format <format>` | `md` (default), `json`, or `docx` |
 | `--mode <mode>` | `combined` (default), `single`, `split-provider`, `split-repo` |
 | `--output <dir>` | Output directory (default: `./session-reports`) |
