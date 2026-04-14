@@ -1,6 +1,6 @@
 # session-report
 
-A command-line tool that aggregates AI coding assistant session histories — **Claude Code**, **Codex CLI**, and **Cursor** — normalizes them into a unified format, and exports them to **PDF** or **DOCX** documents.
+A command-line tool that aggregates AI coding assistant session histories from **Claude Code**, **Codex CLI**, and **Cursor**, normalizes them into a unified format, and exports them to **PDF** or **DOCX** documents.
 
 ## Features
 
@@ -10,7 +10,7 @@ A command-line tool that aggregates AI coding assistant session histories — **
 - Filters by provider, repository, worktree, date range, or session ID
 - Export modes: single file per session, combined, split by provider, split by repo
 - Detects Git context (repo root, branch, worktree)
-- Local-only — no external API calls, no data uploaded
+- Local-only, no external API calls, no data uploaded
 
 ## Installation
 
@@ -33,7 +33,7 @@ node dist/index.cjs <command>
 
 ## Usage
 
-### Scan — overview of detected sessions
+### Scan: overview of detected sessions
 
 ```bash
 session-report scan
@@ -41,7 +41,7 @@ session-report scan --provider claude
 session-report scan --since 2026-01-01 --json
 ```
 
-### List — browse sessions with filters
+### List: browse sessions with filters
 
 ```bash
 session-report list
@@ -51,7 +51,7 @@ session-report list --worktree
 session-report list --no-housekeeping
 ```
 
-### Export — generate PDF or DOCX
+### Export: generate PDF or DOCX
 
 ```bash
 # Combined PDF of all Claude sessions
@@ -114,8 +114,8 @@ session-report export --since 2026-04-01 --until 2026-04-14 --format pdf
 Raw Session Files
   ↓
 Provider Adapters (claude.ts / codex.ts / cursor.ts)
-  ↓ scanFile() — lightweight metadata
-  ↓ parseFile() — full event extraction
+  ↓ scanFile() - lightweight metadata
+  ↓ parseFile() - full event extraction
   ↓
 Normalization Layer (normalize.ts)
   ↓ EventKind normalization
@@ -125,8 +125,8 @@ Normalization Layer (normalize.ts)
 Markdown Renderer (render/markdown.ts)
   ↓
 Export Layer
-  ├── PDF (export/pdf.ts) — Playwright + marked + highlight.js
-  └── DOCX (export/docx.ts) — docx library
+  ├── PDF (export/pdf.ts) - Playwright + marked + highlight.js
+  └── DOCX (export/docx.ts) - docx library
 ```
 
 ## Session Storage Locations
