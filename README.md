@@ -14,20 +14,30 @@ A command-line tool that aggregates AI coding assistant session histories from *
 
 ## Installation
 
+### Run without cloning (recommended)
+
 ```bash
+npx github:Adyasha8105/session-report scan
+npx github:Adyasha8105/session-report list --provider claude
+npx github:Adyasha8105/session-report export --format pdf
+```
+
+> Requires Node.js >= 20. On first run, npm will install dependencies automatically.
+
+### Install globally
+
+```bash
+npm install -g github:Adyasha8105/session-report
+session-report scan
+```
+
+### Clone and build locally
+
+```bash
+git clone https://github.com/Adyasha8105/session-report.git
+cd session-report
 npm install
 npm run build
-```
-
-After building, link the CLI globally:
-
-```bash
-npm link
-```
-
-Or run directly:
-
-```bash
 node dist/index.cjs <command>
 ```
 
