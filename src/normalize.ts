@@ -76,9 +76,10 @@ export function coalesceEvents(events: SessionEvent[]): SessionEvent[] {
       pending.messageId === ev.messageId
     ) {
       // Merge text into pending
+      const prev = pending as SessionEvent;
       pending = {
-        ...pending,
-        text: [pending.text, ev.text].filter(Boolean).join(''),
+        ...prev,
+        text: [prev.text, ev.text].filter(Boolean).join(''),
         isDelta: false,
       };
     } else {

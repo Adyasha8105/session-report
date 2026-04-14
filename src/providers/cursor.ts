@@ -364,7 +364,7 @@ function queryCursorDb(dbPath: string): CursorChatData | null {
   try {
     // Dynamic require to avoid top-level import crash when better-sqlite3 isn't installed
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3') as typeof import('better-sqlite3').default;
+    const Database = require('better-sqlite3') as typeof import('better-sqlite3');
     const db = new Database(dbPath, { readonly: true, fileMustExist: true });
     try {
       const row = db

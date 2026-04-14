@@ -1,5 +1,6 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
+import type { Token, Tokens, TokensList } from 'marked';
 import {
   Document,
   Packer,
@@ -63,7 +64,7 @@ export async function exportToDocx(
 
 type DocxElement = Paragraph | Table;
 
-function tokensToDocxElements(tokens: marked.TokensList | marked.Token[]): DocxElement[] {
+function tokensToDocxElements(tokens: TokensList | Token[]): DocxElement[] {
   const elements: DocxElement[] = [];
 
   for (const token of tokens) {
@@ -74,20 +75,20 @@ function tokensToDocxElements(tokens: marked.TokensList | marked.Token[]): DocxE
   return elements;
 }
 
-function tokenToElements(token: marked.Token): DocxElement[] {
+function tokenToElements(token: Token): DocxElement[] {
   switch (token.type) {
     case 'heading':
-      return [headingToDocx(token)];
+      return [headingToDocx(token as Tokens.Heading)];
     case 'paragraph':
-      return [paragraphToDocx(token)];
+      return [paragraphToDocx(token as Tokens.Paragraph)];
     case 'code':
-      return codeBlockToDocx(token);
+      return codeBlockToDocx(token as Tokens.Code);
     case 'blockquote':
-      return blockquoteToDocx(token);
+      return blockquoteToDocx(token as Tokens.Blockquote);
     case 'list':
-      return listToDocx(token);
+      return listToDocx(token as Tokens.List);
     case 'table':
-      return [tableToDocx(token)];
+      return [tableToDocx(token as Tokens.Table)];
     case 'hr':
       return [hrToDocx()];
     case 'space':
@@ -97,8 +98,8 @@ function tokenToElements(token: marked.Token): DocxElement[] {
   }
 }
 
-function headingToDocx(token: marked.Tokens.Heading): Paragraph {
-  const levelMap: Record<number, HeadingLevel> = {
+function headingToDocx(token: Tokens.Heading): Paragraph {
+  const levelMap: Record<number, (typeof HeadingLevel)[keyof typeof HeadingLevel]> = {
     1: HeadingLevel.HEADING_1,
     2: HeadingLevel.HEADING_2,
     3: HeadingLevel.HEADING_3,
@@ -113,7 +114,7 @@ function headingToDocx(token: marked.Tokens.Heading): Paragraph {
   });
 }
 
-function paragraphToDocx(token: marked.Tokens.Paragraph): Paragraph {
+function paragraphToDocx(token: Tokens.Paragraph): Paragraph {
   const runs = inlineTokensToRuns(token.tokens ?? []);
   return new Paragraph({
     children: runs.length > 0 ? runs : [new TextRun(token.text)],
@@ -121,10 +122,10 @@ function paragraphToDocx(token: marked.Tokens.Paragraph): Paragraph {
   });
 }
 
-function codeBlockToDocx(token: marked.Tokens.Code): DocxElement[] {
+function codeBlockToDocx(token: Tokens.Code): DocxElement[] {
   const lines = token.text.split('\n');
   return lines.map(
-    (line) =>
+    (line: string) =>
       new Paragraph({
         children: [
           new TextRun({
@@ -141,7 +142,7 @@ function codeBlockToDocx(token: marked.Tokens.Code): DocxElement[] {
   );
 }
 
-function blockquoteToDocx(token: marked.Tokens.Blockquote): DocxElement[] {
+function blockquoteToDocx(token: Tokens.Blockquote): DocxElement[] {
   const text = stripInlineMarkdown(token.text);
   return [
     new Paragraph({
@@ -155,9 +156,9 @@ function blockquoteToDocx(token: marked.Tokens.Blockquote): DocxElement[] {
   ];
 }
 
-function listToDocx(token: marked.Tokens.List): DocxElement[] {
+function listToDocx(token: Tokens.List): DocxElement[] {
   return token.items.map(
-    (item, index) =>
+    (item: Tokens.ListItem, index: number) =>
       new Paragraph({
         children: [
           new TextRun(
@@ -170,14 +171,14 @@ function listToDocx(token: marked.Tokens.List): DocxElement[] {
   );
 }
 
-function tableToDocx(token: marked.Tokens.Table): Table {
+function tableToDocx(token: Tokens.Table): Table {
   const rows: TableRow[] = [];
 
   // Header row
   rows.push(
     new TableRow({
       children: token.header.map(
-        (cell) =>
+        (cell: Tokens.TableCell) =>
           new TableCell({
             children: [
               new Paragraph({
@@ -196,7 +197,7 @@ function tableToDocx(token: marked.Tokens.Table): Table {
     rows.push(
       new TableRow({
         children: row.map(
-          (cell) =>
+          (cell: Tokens.TableCell) =>
             new TableCell({
               children: [
                 new Paragraph({ text: stripInlineMarkdown(cell.text) }),
@@ -226,7 +227,7 @@ function hrToDocx(): Paragraph {
 
 // ---- Inline token rendering ----
 
-function inlineTokensToRuns(tokens: marked.Token[]): TextRun[] {
+function inlineTokensToRuns(tokens: Token[]): TextRun[] {
   const runs: TextRun[] = [];
   for (const token of tokens) {
     if (token.type === 'text') {
