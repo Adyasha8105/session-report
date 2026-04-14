@@ -10,7 +10,7 @@ export type EventKind =
   | 'meta'
   | 'error';
 
-export type ExportFormat = 'pdf' | 'docx';
+export type ExportFormat = 'pdf' | 'docx' | 'md' | 'json';
 export type ExportMode = 'single' | 'combined' | 'split-provider' | 'split-repo';
 
 // ---- Content blocks (mirrors Anthropic format) ----

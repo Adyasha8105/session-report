@@ -1,4 +1,4 @@
-import { mkdirSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -12,8 +12,8 @@ import { slugify, formatDate, parseDateArg } from '../util/paths.js';
 
 export function createExportCommand(): Command {
   return new Command('export')
-    .description('Export sessions to PDF or DOCX')
-    .option('--format <format>', 'Output format: pdf or docx', 'docx')
+    .description('Export sessions to PDF, DOCX, MD, or JSON')
+    .option('--format <format>', 'Output format: pdf, docx, md, or json', 'md')
     .option('--mode <mode>', 'Export mode: single | combined | split-provider | split-repo', 'combined')
     .option('--output <dir>', 'Output directory', './session-reports')
     .option('-p, --provider <provider...>', 'Filter by provider: claude, codex, cursor, gemini, opencode, copilot')
@@ -39,8 +39,8 @@ export function createExportCommand(): Command {
       const format = opts.format as ExportFormat;
       const mode = opts.mode as ExportMode;
 
-      if (!['pdf', 'docx'].includes(format)) {
-        console.error(chalk.red(`Unknown format: ${format}. Use pdf or docx.`));
+      if (!['pdf', 'docx', 'md', 'json'].includes(format)) {
+        console.error(chalk.red(`Unknown format: ${format}. Use pdf, docx, md, or json.`));
         process.exit(1);
       }
       if (!['single', 'combined', 'split-provider', 'split-repo'].includes(mode)) {
@@ -101,10 +101,14 @@ export function createExportCommand(): Command {
         const outputFiles: string[] = [];
 
         if (mode === 'combined') {
-          const md = sessionsToMarkdown(sessions, markdownOpts);
           const filename = `combined-${formatDate(new Date())}.${format}`;
           const outPath = join(opts.output, filename);
-          await exportDocument(md, outPath, format, 'Session Report');
+          if (format === 'json') {
+            writeFileSync(outPath, sessionsToJson(sessions), 'utf8');
+          } else {
+            const md = sessionsToMarkdown(sessions, markdownOpts);
+            await exportDocument(md, outPath, format, 'Session Report');
+          }
           outputFiles.push(outPath);
 
         } else if (mode === 'single') {
@@ -116,11 +120,15 @@ export function createExportCommand(): Command {
               const slug = slugify(title);
               const filename = `${session.provider}-${session.id.slice(0, 8)}-${slug}.${format}`;
               const outPath = join(opts.output, filename);
-              const md = sessionToMarkdown(session, markdownOpts);
-              if (exporter) {
-                await exporter.exportPage(md, outPath, { title: session.title ?? undefined });
+              if (format === 'json') {
+                writeFileSync(outPath, sessionsToJson([session]), 'utf8');
               } else {
-                await exportToDocx(md, outPath);
+                const md = sessionToMarkdown(session, markdownOpts);
+                if (exporter) {
+                  await exporter.exportPage(md, outPath, { title: session.title ?? undefined });
+                } else {
+                  await exportDocument(md, outPath, format, title);
+                }
               }
               outputFiles.push(outPath);
             }
@@ -131,21 +139,29 @@ export function createExportCommand(): Command {
         } else if (mode === 'split-provider') {
           const byProvider = groupBy(sessions, (s) => s.provider);
           for (const [provider, group] of byProvider) {
-            const md = sessionsToMarkdown(group, markdownOpts);
             const filename = `${provider}-sessions-${formatDate(new Date())}.${format}`;
             const outPath = join(opts.output, filename);
-            await exportDocument(md, outPath, format, `${provider} Sessions`);
+            if (format === 'json') {
+              writeFileSync(outPath, sessionsToJson(group), 'utf8');
+            } else {
+              const md = sessionsToMarkdown(group, markdownOpts);
+              await exportDocument(md, outPath, format, `${provider} Sessions`);
+            }
             outputFiles.push(outPath);
           }
 
         } else if (mode === 'split-repo') {
           const byRepo = groupBy(sessions, (s) => s.git?.repoName ?? 'unknown-repo');
           for (const [repo, group] of byRepo) {
-            const md = sessionsToMarkdown(group, markdownOpts);
             const slug = slugify(repo);
             const filename = `${slug}-sessions-${formatDate(new Date())}.${format}`;
             const outPath = join(opts.output, filename);
-            await exportDocument(md, outPath, format, `${repo} Sessions`);
+            if (format === 'json') {
+              writeFileSync(outPath, sessionsToJson(group), 'utf8');
+            } else {
+              const md = sessionsToMarkdown(group, markdownOpts);
+              await exportDocument(md, outPath, format, `${repo} Sessions`);
+            }
             outputFiles.push(outPath);
           }
         }
@@ -177,9 +193,19 @@ async function exportDocument(
 ): Promise<void> {
   if (format === 'pdf') {
     await exportToPdf(md, outputPath, { title });
-  } else {
+  } else if (format === 'docx') {
     await exportToDocx(md, outputPath);
+  } else {
+    // md — just write the markdown string
+    writeFileSync(outputPath, md, 'utf8');
   }
+}
+
+function sessionsToJson(sessions: Session[]): string {
+  return JSON.stringify(sessions, (_key, value) => {
+    if (value instanceof Date) return value.toISOString();
+    return value;
+  }, 2);
 }
 
 function groupBy<T>(arr: T[], key: (item: T) => string): Map<string, T[]> {

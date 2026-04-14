@@ -36362,11 +36362,11 @@ function stripInlineMarkdown2(s) {
 
 // src/cli/export.ts
 function createExportCommand() {
-  return new Command("export").description("Export sessions to PDF or DOCX").option("--format <format>", "Output format: pdf or docx", "docx").option("--mode <mode>", "Export mode: single | combined | split-provider | split-repo", "combined").option("--output <dir>", "Output directory", "./session-reports").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--repo <name>", "Substring match on git repository name").option("--worktree", "Only include worktree sessions").option("--session <id>", "Export a single session by ID prefix").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-meta", "Include system/meta events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-tool-lines <n>", "Max lines of tool output to include", "50").option("--max-message-lines <n>", "Truncate each message after N lines, 0 = unlimited (default: 0)", "0").option("--no-housekeeping", "Exclude sessions with no assistant output").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
+  return new Command("export").description("Export sessions to PDF, DOCX, MD, or JSON").option("--format <format>", "Output format: pdf, docx, md, or json", "md").option("--mode <mode>", "Export mode: single | combined | split-provider | split-repo", "combined").option("--output <dir>", "Output directory", "./session-reports").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--repo <name>", "Substring match on git repository name").option("--worktree", "Only include worktree sessions").option("--session <id>", "Export a single session by ID prefix").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-meta", "Include system/meta events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-tool-lines <n>", "Max lines of tool output to include", "50").option("--max-message-lines <n>", "Truncate each message after N lines, 0 = unlimited (default: 0)", "0").option("--no-housekeeping", "Exclude sessions with no assistant output").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
     const format = opts.format;
     const mode = opts.mode;
-    if (!["pdf", "docx"].includes(format)) {
-      console.error(source_default.red(`Unknown format: ${format}. Use pdf or docx.`));
+    if (!["pdf", "docx", "md", "json"].includes(format)) {
+      console.error(source_default.red(`Unknown format: ${format}. Use pdf, docx, md, or json.`));
       process.exit(1);
     }
     if (!["single", "combined", "split-provider", "split-repo"].includes(mode)) {
@@ -36415,10 +36415,14 @@ function createExportCommand() {
       (0, import_fs12.mkdirSync)(opts.output, { recursive: true });
       const outputFiles = [];
       if (mode === "combined") {
-        const md = sessionsToMarkdown(sessions, markdownOpts);
         const filename = `combined-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
         const outPath = (0, import_path6.join)(opts.output, filename);
-        await exportDocument(md, outPath, format, "Session Report");
+        if (format === "json") {
+          (0, import_fs12.writeFileSync)(outPath, sessionsToJson(sessions), "utf8");
+        } else {
+          const md = sessionsToMarkdown(sessions, markdownOpts);
+          await exportDocument(md, outPath, format, "Session Report");
+        }
         outputFiles.push(outPath);
       } else if (mode === "single") {
         const exporter = format === "pdf" ? new PdfExporter() : null;
@@ -36429,11 +36433,15 @@ function createExportCommand() {
             const slug = slugify(title);
             const filename = `${session.provider}-${session.id.slice(0, 8)}-${slug}.${format}`;
             const outPath = (0, import_path6.join)(opts.output, filename);
-            const md = sessionToMarkdown(session, markdownOpts);
-            if (exporter) {
-              await exporter.exportPage(md, outPath, { title: session.title ?? void 0 });
+            if (format === "json") {
+              (0, import_fs12.writeFileSync)(outPath, sessionsToJson([session]), "utf8");
             } else {
-              await exportToDocx(md, outPath);
+              const md = sessionToMarkdown(session, markdownOpts);
+              if (exporter) {
+                await exporter.exportPage(md, outPath, { title: session.title ?? void 0 });
+              } else {
+                await exportDocument(md, outPath, format, title);
+              }
             }
             outputFiles.push(outPath);
           }
@@ -36443,20 +36451,28 @@ function createExportCommand() {
       } else if (mode === "split-provider") {
         const byProvider = groupBy(sessions, (s) => s.provider);
         for (const [provider, group] of byProvider) {
-          const md = sessionsToMarkdown(group, markdownOpts);
           const filename = `${provider}-sessions-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
           const outPath = (0, import_path6.join)(opts.output, filename);
-          await exportDocument(md, outPath, format, `${provider} Sessions`);
+          if (format === "json") {
+            (0, import_fs12.writeFileSync)(outPath, sessionsToJson(group), "utf8");
+          } else {
+            const md = sessionsToMarkdown(group, markdownOpts);
+            await exportDocument(md, outPath, format, `${provider} Sessions`);
+          }
           outputFiles.push(outPath);
         }
       } else if (mode === "split-repo") {
         const byRepo = groupBy(sessions, (s) => s.git?.repoName ?? "unknown-repo");
         for (const [repo, group] of byRepo) {
-          const md = sessionsToMarkdown(group, markdownOpts);
           const slug = slugify(repo);
           const filename = `${slug}-sessions-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
           const outPath = (0, import_path6.join)(opts.output, filename);
-          await exportDocument(md, outPath, format, `${repo} Sessions`);
+          if (format === "json") {
+            (0, import_fs12.writeFileSync)(outPath, sessionsToJson(group), "utf8");
+          } else {
+            const md = sessionsToMarkdown(group, markdownOpts);
+            await exportDocument(md, outPath, format, `${repo} Sessions`);
+          }
           outputFiles.push(outPath);
         }
       }
@@ -36480,9 +36496,17 @@ ${allErrors.length} file(s) had errors and were skipped.`));
 async function exportDocument(md, outputPath, format, title) {
   if (format === "pdf") {
     await exportToPdf(md, outputPath, { title });
-  } else {
+  } else if (format === "docx") {
     await exportToDocx(md, outputPath);
+  } else {
+    (0, import_fs12.writeFileSync)(outputPath, md, "utf8");
   }
+}
+function sessionsToJson(sessions) {
+  return JSON.stringify(sessions, (_key, value) => {
+    if (value instanceof Date) return value.toISOString();
+    return value;
+  }, 2);
 }
 function groupBy(arr, key) {
   const map = /* @__PURE__ */ new Map();
@@ -36497,11 +36521,11 @@ function groupBy(arr, key) {
 
 // src/cli/copy.ts
 var import_child_process = require("child_process");
-var DEFAULT_MAX_CHARS = 8e4;
+var DEFAULT_MAX_CHARS = 0;
 function createCopyCommand() {
-  return new Command("copy").description("Copy session context to clipboard for pasting into another AI tool").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--session <id>", "Copy a specific session by ID prefix").option("--repo <name>", "Substring match on git repository name").option("--last <n>", "Number of most recent sessions to include", "1").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-chars <n>", `Truncate output to N characters (default: ${DEFAULT_MAX_CHARS})`).option("--max-message-lines <n>", "Truncate each message after N lines, 0 = unlimited (default: 0)", "0").option("--stdout", "Print to stdout instead of copying to clipboard").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
+  return new Command("copy").description("Copy session context to clipboard for pasting into another AI tool").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--session <id>", "Copy a specific session by ID prefix").option("--repo <name>", "Substring match on git repository name").option("--last <n>", "Number of most recent sessions to include", "1").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-chars <n>", "Truncate output to N characters, 0 = unlimited (default: 0)").option("--max-message-lines <n>", "Truncate each message after N lines, 0 = unlimited (default: 0)", "0").option("--stdout", "Print to stdout instead of copying to clipboard").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
     const last = Math.max(1, parseInt(opts.last, 10) || 1);
-    const maxChars = parseInt(opts.maxChars, 10) || DEFAULT_MAX_CHARS;
+    const maxChars = opts.maxChars !== void 0 ? parseInt(opts.maxChars, 10) || 0 : DEFAULT_MAX_CHARS;
     const markdownOpts = {
       ...DEFAULT_MARKDOWN_OPTIONS,
       includeToolCalls: Boolean(opts.includeToolCalls),
@@ -36555,7 +36579,7 @@ function createCopyCommand() {
 ---
 
 ${body}`;
-      if (output.length > maxChars) {
+      if (maxChars > 0 && output.length > maxChars) {
         const truncated = output.slice(output.length - maxChars);
         const firstNewline = truncated.indexOf("\n");
         output = `> *(context truncated to last ${maxChars.toLocaleString()} characters)*

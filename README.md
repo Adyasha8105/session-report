@@ -3,7 +3,7 @@
 Hit a rate limit? Switch tools without losing context.
 Need to share your work? Export everything into one document.
 
-`session-report` reads your AI coding sessions from **Claude Code**, **Codex CLI**, **Cursor**, **Gemini CLI**, **OpenCode**, and **GitHub Copilot** and exports them as PDF or DOCX — across any number of sessions, tools, or Git worktrees.
+`session-report` reads your AI coding sessions from **Claude Code**, **Codex CLI**, **Cursor**, **Gemini CLI**, **OpenCode**, and **GitHub Copilot** and exports them as Markdown, JSON, PDF, or DOCX — across any number of sessions, tools, or Git worktrees.
 
 ## What it solves
 
@@ -17,7 +17,9 @@ Need to submit or review what you built with AI? One command generates a clean, 
 
 ```bash
 npm install -g session-report
-session-report export --format pdf --output ./output
+session-report export               # exports as Markdown (default)
+session-report export --format json # exports as JSON
+session-report export --format pdf  # exports as PDF
 ```
 
 ## Installation
@@ -31,7 +33,8 @@ npm install -g session-report
 ### npx (no install)
 
 ```bash
-npx session-report export --format pdf
+npx session-report export               # Markdown
+npx session-report export --format pdf  # PDF
 ```
 
 
@@ -58,36 +61,42 @@ The copied text is ready to paste directly into Claude, ChatGPT, Gemini, or any 
 ### Export everything into one document
 
 ```bash
-session-report export --format pdf --output ./output
+session-report export                          # Markdown (default)
+session-report export --format json            # JSON
+session-report export --format pdf             # PDF
+session-report export --format docx            # DOCX
+session-report export --output ./output        # custom output dir
 ```
 
 ### Export sessions from a specific project or worktree
 
 ```bash
-session-report export --repo my-project --format pdf
-session-report export --worktree --format pdf
+session-report export --repo my-project
+session-report export --worktree
 ```
 
 ### Export from a specific tool
 
 ```bash
-session-report export --provider claude --format pdf
-session-report export --provider codex --format docx
+session-report export --provider claude
+session-report export --provider codex  --format json
 session-report export --provider gemini --format pdf
-session-report export --provider opencode --format pdf
+session-report export --provider opencode
 session-report export --provider copilot --format docx
 ```
 
 ### One file per session
 
 ```bash
-session-report export --mode single --format pdf --output ./sessions
+session-report export --mode single --output ./sessions
+session-report export --mode single --format json --output ./sessions
 ```
 
 ### Filter by date
 
 ```bash
-session-report export --since 2026-04-01 --format pdf
+session-report export --since 2026-04-01
+session-report export --since 2026-04-01 --format json
 ```
 
 ## Commands
@@ -97,7 +106,7 @@ session-report export --since 2026-04-01 --format pdf
 | `scan` | Summary of all detected sessions by provider |
 | `list` | Browse sessions with filters |
 | `copy` | Copy session context to clipboard for pasting into another AI tool |
-| `export` | Export sessions to PDF or DOCX |
+| `export` | Export sessions to Markdown, JSON, PDF, or DOCX |
 
 ## Flags
 
@@ -118,7 +127,7 @@ session-report export --since 2026-04-01 --format pdf
 | Flag | Description |
 |---|---|
 | `--last <n>` | Number of most recent sessions to include (default: `1`) |
-| `--max-chars <n>` | Truncate output to N characters (default: `80000`) |
+| `--max-chars <n>` | Truncate output to N characters, `0` = unlimited (default: `0`) |
 | `--stdout` | Print to stdout instead of copying to clipboard |
 | `--include-tool-calls` | Include tool call/result events |
 | `--include-thinking` | Include thinking blocks |
@@ -128,7 +137,7 @@ session-report export --since 2026-04-01 --format pdf
 
 | Flag | Description |
 |---|---|
-| `--format <format>` | `docx` (default) or `pdf` |
+| `--format <format>` | `md` (default), `json`, `docx`, or `pdf` |
 | `--mode <mode>` | `combined` (default), `single`, `split-provider`, `split-repo` |
 | `--output <dir>` | Output directory (default: `./session-reports`) |
 | `--include-tool-calls` | Include tool call/result events |

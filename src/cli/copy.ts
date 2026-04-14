@@ -7,7 +7,7 @@ import { discoverSessions, parseSessions } from '../discovery.js';
 import { sessionToMarkdown, sessionsToMarkdown, DEFAULT_MARKDOWN_OPTIONS } from '../render/markdown.js';
 import { parseDateArg } from '../util/paths.js';
 
-const DEFAULT_MAX_CHARS = 80_000;
+const DEFAULT_MAX_CHARS = 0; // 0 = unlimited
 
 export function createCopyCommand(): Command {
   return new Command('copy')
@@ -21,7 +21,7 @@ export function createCopyCommand(): Command {
     .option('--include-tool-calls', 'Include tool call and result events')
     .option('--include-thinking', 'Include thinking blocks')
     .option('--include-timestamps', 'Prefix events with timestamps')
-    .option('--max-chars <n>', `Truncate output to N characters (default: ${DEFAULT_MAX_CHARS})`)
+    .option('--max-chars <n>', 'Truncate output to N characters, 0 = unlimited (default: 0)')
     .option('--max-message-lines <n>', 'Truncate each message after N lines, 0 = unlimited (default: 0)', '0')
     .option('--stdout', 'Print to stdout instead of copying to clipboard')
     .option('--claude-root <path>', 'Override ~/.claude directory')
@@ -32,7 +32,7 @@ export function createCopyCommand(): Command {
     .option('--copilot-root <path>', 'Override ~/.copilot directory')
     .action(async (opts) => {
       const last = Math.max(1, parseInt(opts.last, 10) || 1);
-      const maxChars = parseInt(opts.maxChars, 10) || DEFAULT_MAX_CHARS;
+      const maxChars = opts.maxChars !== undefined ? (parseInt(opts.maxChars, 10) || 0) : DEFAULT_MAX_CHARS;
 
       const markdownOpts = {
         ...DEFAULT_MARKDOWN_OPTIONS,
@@ -98,7 +98,7 @@ export function createCopyCommand(): Command {
         let output = `${preamble}\n\n---\n\n${body}`;
 
         // Step 4: Truncate from the front if too long (keep the most recent context)
-        if (output.length > maxChars) {
+        if (maxChars > 0 && output.length > maxChars) {
           const truncated = output.slice(output.length - maxChars);
           // Find the first newline so we don't start mid-line
           const firstNewline = truncated.indexOf('\n');
