@@ -9,7 +9,7 @@ await esbuild.build({
   format: 'cjs',
   outfile: 'dist/index.cjs',
   external: [
-    'playwright',
+    'pdfkit',
     'better-sqlite3',
   ],
   banner: {

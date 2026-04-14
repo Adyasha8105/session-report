@@ -34,15 +34,6 @@ npm install -g session-report
 npx session-report export --format pdf
 ```
 
-### Homebrew
-
-```bash
-brew tap Adyasha8105/session-report https://github.com/Adyasha8105/session-report
-brew install Adyasha8105/session-report/session-report
-```
-
-> For PDF export, also run: `npx playwright install chromium`
-> DOCX export works with no extra steps.
 
 ## Usage
 
@@ -169,7 +160,6 @@ session-report export --since 2026-04-01 --format pdf
 ## Requirements
 
 - Node.js >= 20
-- Playwright Chromium for PDF export (`npx playwright install chromium`)
 
 ## Development
 
