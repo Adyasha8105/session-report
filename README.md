@@ -8,7 +8,7 @@ Need to share your work? Export everything into one document.
 ## What it solves
 
 **Switching tools mid-build**
-Hit Claude's rate limit? Export your session history and hand it to Codex or Cursor. Full context, zero re-explaining.
+Hit Claude's rate limit? Run `session-report copy` and paste directly into Codex, Cursor, or any other AI tool. Full context, zero re-explaining.
 
 **Sharing your work**
 Need to submit or review what you built with AI? One command generates a clean, readable document of everything — regardless of which tools you used.
@@ -53,6 +53,17 @@ session-report scan
 session-report list
 ```
 
+### Copy session context to clipboard (for switching AI tools)
+
+```bash
+session-report copy                        # copy most recent session
+session-report copy --last 3               # copy last 3 sessions
+session-report copy --provider claude      # copy most recent Claude session
+session-report copy --session abc123       # copy a specific session
+```
+
+The copied text is ready to paste directly into Claude, ChatGPT, Gemini, or any other AI tool.
+
 ### Export everything into one document
 
 ```bash
@@ -94,6 +105,7 @@ session-report export --since 2026-04-01 --format pdf
 |---|---|
 | `scan` | Summary of all detected sessions by provider |
 | `list` | Browse sessions with filters |
+| `copy` | Copy session context to clipboard for pasting into another AI tool |
 | `export` | Export sessions to PDF or DOCX |
 
 ## Flags
@@ -109,6 +121,17 @@ session-report export --since 2026-04-01 --format pdf
 | `--since <date>` | Only sessions after this ISO date |
 | `--until <date>` | Only sessions before this ISO date |
 | `--no-housekeeping` | Exclude sessions with no assistant output |
+
+### Copy flags
+
+| Flag | Description |
+|---|---|
+| `--last <n>` | Number of most recent sessions to include (default: `1`) |
+| `--max-chars <n>` | Truncate output to N characters (default: `80000`) |
+| `--stdout` | Print to stdout instead of copying to clipboard |
+| `--include-tool-calls` | Include tool call/result events |
+| `--include-thinking` | Include thinking blocks |
+| `--include-timestamps` | Prefix each event with its timestamp |
 
 ### Export flags
 

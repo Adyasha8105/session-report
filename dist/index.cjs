@@ -88256,12 +88256,148 @@ function groupBy(arr, key) {
   return map;
 }
 
+// src/cli/copy.ts
+var import_child_process = require("child_process");
+var DEFAULT_MAX_CHARS = 8e4;
+function createCopyCommand() {
+  return new Command("copy").description("Copy session context to clipboard for pasting into another AI tool").option("-p, --provider <provider...>", "Filter by provider: claude, codex, cursor, gemini, opencode, copilot").option("--session <id>", "Copy a specific session by ID prefix").option("--repo <name>", "Substring match on git repository name").option("--last <n>", "Number of most recent sessions to include", "1").option("--since <date>", "Only sessions after this date (ISO 8601)").option("--until <date>", "Only sessions before this date (ISO 8601)").option("--include-tool-calls", "Include tool call and result events").option("--include-thinking", "Include thinking blocks").option("--include-timestamps", "Prefix events with timestamps").option("--max-chars <n>", `Truncate output to N characters (default: ${DEFAULT_MAX_CHARS})`).option("--stdout", "Print to stdout instead of copying to clipboard").option("--claude-root <path>", "Override ~/.claude directory").option("--codex-root <path>", "Override ~/.codex directory").option("--cursor-root <path>", "Override ~/.cursor directory").option("--gemini-root <path>", "Override ~/.gemini directory").option("--opencode-root <path>", "Override ~/.local/share/opencode directory").option("--copilot-root <path>", "Override ~/.copilot directory").action(async (opts) => {
+    const last = Math.max(1, parseInt(opts.last, 10) || 1);
+    const maxChars = parseInt(opts.maxChars, 10) || DEFAULT_MAX_CHARS;
+    const markdownOpts = {
+      ...DEFAULT_MARKDOWN_OPTIONS,
+      includeToolCalls: Boolean(opts.includeToolCalls),
+      includeThinking: Boolean(opts.includeThinking),
+      includeTimestamps: Boolean(opts.includeTimestamps)
+    };
+    const spinner = ora("Finding sessions\u2026").start();
+    try {
+      const providerFilter = opts.provider;
+      const { sessions: discovered, errors } = await discoverSessions({
+        providers: providerFilter,
+        claudeRoot: opts.claudeRoot,
+        codexRoot: opts.codexRoot,
+        cursorRoot: opts.cursorRoot,
+        geminiRoot: opts.geminiRoot,
+        openCodeRoot: opts.openCodeRoot,
+        copilotRoot: opts.copilotRoot,
+        filter: {
+          provider: providerFilter,
+          repo: opts.repo,
+          session: opts.session,
+          since: opts.since ? parseDateArg(opts.since, "--since") : void 0,
+          until: opts.until ? parseDateArg(opts.until, "--until") : void 0,
+          noHousekeeping: true
+        }
+      });
+      if (discovered.length === 0) {
+        spinner.stop();
+        console.log(source_default.yellow("No sessions found."));
+        return;
+      }
+      const toProcess = discovered.slice(0, last);
+      spinner.text = `Parsing ${toProcess.length} session(s)\u2026`;
+      const { sessions } = await parseSessions(toProcess);
+      if (sessions.length === 0) {
+        spinner.stop();
+        console.log(source_default.yellow("No sessions could be parsed."));
+        return;
+      }
+      spinner.text = "Rendering\u2026";
+      const preamble = buildPreamble(sessions.map((s) => s.provider), sessions[0]?.title ?? null);
+      let body;
+      if (sessions.length === 1) {
+        body = sessionToMarkdown(sessions[0], markdownOpts);
+      } else {
+        body = sessionsToMarkdown(sessions, markdownOpts);
+      }
+      let output = `${preamble}
+
+---
+
+${body}`;
+      if (output.length > maxChars) {
+        const truncated = output.slice(output.length - maxChars);
+        const firstNewline = truncated.indexOf("\n");
+        output = `> *(context truncated to last ${maxChars.toLocaleString()} characters)*
+
+` + (firstNewline >= 0 ? truncated.slice(firstNewline + 1) : truncated);
+      }
+      spinner.stop();
+      if (opts.stdout) {
+        process.stdout.write(output);
+        return;
+      }
+      const copied = copyToClipboard(output);
+      if (copied) {
+        const charCount = output.length.toLocaleString();
+        const sessionWord = sessions.length === 1 ? "session" : "sessions";
+        console.log(source_default.green(`
+Copied ${sessions.length} ${sessionWord} (${charCount} chars) to clipboard.`));
+        console.log(source_default.gray("Paste it into any AI tool to continue your work.\n"));
+        for (const s of sessions) {
+          const title = s.title ?? "(untitled)";
+          const date = s.startTime?.toISOString().slice(0, 10) ?? s.endTime?.toISOString().slice(0, 10) ?? "";
+          const events2 = s.eventCount;
+          console.log(`  ${source_default.cyan(s.provider.padEnd(10))} ${source_default.white(title.slice(0, 50).padEnd(52))} ${source_default.gray(date)} ${source_default.gray(`${events2} events`)}`);
+        }
+        if (errors.length > 0) {
+          console.log(source_default.yellow(`
+${errors.length} file(s) skipped due to errors.`));
+        }
+      } else {
+        console.error(source_default.yellow("Could not access clipboard. Printing to stdout instead.\n"));
+        process.stdout.write(output);
+      }
+    } catch (err) {
+      spinner.stop();
+      console.error(source_default.red("Error:"), err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  });
+}
+function buildPreamble(providers, title) {
+  const providerList = [...new Set(providers)].join(", ");
+  const titleLine = title ? `**Session:** ${title}
+> ` : "";
+  return [
+    "> **AI Coding Session Context**",
+    `> ${titleLine}**Tool:** ${providerList}`,
+    ">",
+    "> I was working on this project and need to continue in a new context.",
+    "> Below is the full session transcript. Please read it and help me continue."
+  ].join("\n");
+}
+function copyToClipboard(text) {
+  try {
+    if (process.platform === "darwin") {
+      (0, import_child_process.execSync)("pbcopy", { input: text, stdio: ["pipe", "ignore", "ignore"] });
+      return true;
+    }
+    if (process.platform === "linux") {
+      try {
+        (0, import_child_process.execSync)("xclip -selection clipboard", { input: text, stdio: ["pipe", "ignore", "ignore"] });
+        return true;
+      } catch {
+        (0, import_child_process.execSync)("xsel --clipboard --input", { input: text, stdio: ["pipe", "ignore", "ignore"] });
+        return true;
+      }
+    }
+    if (process.platform === "win32") {
+      (0, import_child_process.execSync)("clip", { input: text, stdio: ["pipe", "ignore", "ignore"] });
+      return true;
+    }
+  } catch {
+  }
+  return false;
+}
+
 // src/cli/program.ts
 function createProgram() {
-  const program3 = new Command().name("session-report").description("Export AI coding assistant sessions (Claude Code, Codex CLI, Cursor, Gemini CLI, OpenCode, GitHub Copilot) to PDF or DOCX").version("1.0.0");
+  const program3 = new Command().name("session-report").description("Export AI coding assistant sessions (Claude Code, Codex CLI, Cursor, Gemini CLI, OpenCode, GitHub Copilot) to PDF or DOCX").version("1.0.2");
   program3.addCommand(createScanCommand());
   program3.addCommand(createListCommand());
   program3.addCommand(createExportCommand());
+  program3.addCommand(createCopyCommand());
   return program3;
 }
 
