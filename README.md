@@ -1,70 +1,47 @@
 # session-report
 
-A command-line tool that aggregates AI coding assistant session histories from **Claude Code**, **Codex CLI**, and **Cursor**, normalizes them into a unified format, and exports them to **PDF** or **DOCX** documents.
-
-## Features
-
-- Discovers sessions from Claude Code (`~/.claude`), Codex CLI (`~/.codex`), and Cursor (`~/.cursor`)
-- Normalizes all formats into a unified schema
-- Exports to PDF (via Playwright/Chromium) or DOCX (via `docx`)
-- Filters by provider, repository, worktree, date range, or session ID
-- Export modes: single file per session, combined, split by provider, split by repo
-- Detects Git context (repo root, branch, worktree)
-- Local-only, no external API calls, no data uploaded
+A CLI tool that exports AI coding assistant sessions from **Claude Code**, **Codex CLI**, and **Cursor** into **PDF** or **DOCX** documents.
 
 ## Installation
 
-### Homebrew (recommended)
+### npm (recommended)
+
+```bash
+npm install -g session-report
+```
+
+### npx (no install required)
+
+```bash
+npx session-report scan
+```
+
+### Homebrew
 
 ```bash
 brew tap Adyasha8105/session-report https://github.com/Adyasha8105/session-report
 brew install Adyasha8105/session-report/session-report
 ```
 
-Then use it from any terminal:
-
-```bash
-session-report scan
-session-report list --provider claude
-session-report export --format pdf
-```
-
-> For PDF export, also run: `npx playwright install chromium`
+> For PDF export, run `npx playwright install chromium` after installing.
 > DOCX export works immediately with no extra steps.
 
-### npx (no install)
+## Commands
 
-```bash
-npx github:Adyasha8105/session-report scan
-```
+### `scan`
 
-### npm global
-
-```bash
-npm install -g github:Adyasha8105/session-report
-```
-
-### Clone and build locally
-
-```bash
-git clone https://github.com/Adyasha8105/session-report.git
-cd session-report
-npm install
-npm run build
-node dist/index.cjs <command>
-```
-
-## Usage
-
-### Scan: overview of detected sessions
+Show a summary of all detected sessions grouped by provider.
 
 ```bash
 session-report scan
 session-report scan --provider claude
-session-report scan --since 2026-01-01 --json
+session-report scan --since 2026-01-01
+session-report scan --json
 ```
 
-### List: browse sessions with filters
+### `list`
+
+Browse sessions with filters.
 
 ```bash
 session-report list
@@ -74,39 +51,33 @@ session-report list --worktree
 session-report list --no-housekeeping
 ```
 
-### Export: generate PDF or DOCX
+### `export`
+
+Export sessions to PDF or DOCX.
 
 ```bash
-# Combined PDF of all Claude sessions
-session-report export --provider claude --format pdf --mode combined
+# Combined PDF of all sessions
+session-report export --format pdf
 
-# One DOCX per session
+# One file per session
 session-report export --format docx --mode single --output ./out
 
-# Split by repository (one PDF per repo)
-session-report export --format pdf --mode split-repo --output ./reports
+# Split by repository
+session-report export --format pdf --mode split-repo
 
-# Export a single session by ID
+# Export a specific session
 session-report export --session abc123 --format pdf
+
+# Filter by provider and date range
+session-report export --provider claude --since 2026-04-01 --format pdf
 
 # Include tool calls and timestamps
 session-report export --include-tool-calls --include-timestamps --format pdf
-
-# Filter by date range
-session-report export --since 2026-04-01 --until 2026-04-14 --format pdf
 ```
 
-## CLI Flags
+## Flags
 
-### Global
-
-| Flag | Description |
-|---|---|
-| `--claude-root <path>` | Override `~/.claude` directory |
-| `--codex-root <path>` | Override `~/.codex` directory |
-| `--cursor-root <path>` | Override `~/.cursor` directory |
-
-### Filter Flags (available on `list` and `export`)
+### Filter flags (available on `list` and `export`)
 
 | Flag | Description |
 |---|---|
@@ -118,7 +89,7 @@ session-report export --since 2026-04-01 --until 2026-04-14 --format pdf
 | `--until <date>` | Only sessions before this ISO date |
 | `--no-housekeeping` | Exclude sessions with no assistant output |
 
-### Export Flags
+### Export flags
 
 | Flag | Description |
 |---|---|
@@ -128,31 +99,18 @@ session-report export --since 2026-04-01 --until 2026-04-14 --format pdf
 | `--include-tool-calls` | Include tool call/result events |
 | `--include-meta` | Include system/meta events |
 | `--include-thinking` | Include thinking blocks |
-| `--include-timestamps` | Prefix events with timestamps |
-| `--max-tool-lines <n>` | Max lines of tool output (default: 50) |
+| `--include-timestamps` | Prefix each event with its timestamp |
+| `--max-tool-lines <n>` | Max lines of tool output to include (default: `50`) |
 
-## Architecture
+### Global flags
 
-```
-Raw Session Files
-  ↓
-Provider Adapters (claude.ts / codex.ts / cursor.ts)
-  ↓ scanFile() - lightweight metadata
-  ↓ parseFile() - full event extraction
-  ↓
-Normalization Layer (normalize.ts)
-  ↓ EventKind normalization
-  ↓ Title extraction
-  ↓ Git context detection (git.ts)
-  ↓
-Markdown Renderer (render/markdown.ts)
-  ↓
-Export Layer
-  ├── PDF (export/pdf.ts) - Playwright + marked + highlight.js
-  └── DOCX (export/docx.ts) - docx library
-```
+| Flag | Description |
+|---|---|
+| `--claude-root <path>` | Override `~/.claude` directory |
+| `--codex-root <path>` | Override `~/.codex` directory |
+| `--cursor-root <path>` | Override `~/.cursor` directory |
 
-## Session Storage Locations
+## Session storage locations
 
 | Provider | Location |
 |---|---|
@@ -161,26 +119,40 @@ Export Layer
 | Cursor (JSONL) | `~/.cursor/projects/*/agent-transcripts/**/*.jsonl` |
 | Cursor (SQLite) | `~/.cursor/chats/**/store.db` |
 
-## Requirements
+## How it works
 
-- Node.js >= 20
-- Playwright Chromium (installed automatically via `postinstall`)
+```
+Session files on disk
+  ↓
+Provider adapters (Claude / Codex / Cursor)
+  ↓ scanFile()  - fast metadata read
+  ↓ parseFile() - full event extraction
+  ↓
+Normalize events (roles, kinds, titles, git context)
+  ↓
+Render to Markdown
+  ↓
+Export
+  ├── PDF  - Playwright + marked + highlight.js
+  └── DOCX - docx library
+```
 
 ## Development
 
 ```bash
-# Run in dev mode (no build needed)
-npm run dev -- scan
-
-# Type check
-npm run typecheck
-
-# Run tests
-npm test
-
-# Build
-npm run build
+git clone https://github.com/Adyasha8105/session-report.git
+cd session-report
+npm install
+npm run dev -- scan     # run without building
+npm run typecheck       # type check
+npm test                # run tests
+npm run build           # build to dist/
 ```
+
+## Requirements
+
+- Node.js >= 20
+- Playwright Chromium for PDF export (`npx playwright install chromium`)
 
 ## License
 
