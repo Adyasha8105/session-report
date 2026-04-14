@@ -69,7 +69,7 @@ export class CopilotAdapter implements ProviderAdapter {
         cwd,
         git: null,
         events: [],
-        eventCount: 0,
+        eventCount: Math.round(stat.size / 200),
         fileSizeBytes: stat.size,
         isHousekeeping: false,
         isFullyParsed: false,

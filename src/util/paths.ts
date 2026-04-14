@@ -44,6 +44,19 @@ export function formatDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Parse an ISO date string from CLI input.
+ * Exits with an error message on invalid input.
+ */
+export function parseDateArg(value: string, flag: string): Date {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) {
+    console.error(`Invalid date for ${flag}: "${value}". Use ISO 8601 format, e.g. 2026-04-01`);
+    process.exit(1);
+  }
+  return d;
+}
+
 /** Cap a string at maxBytes UTF-8 bytes. */
 export function capBytes(s: string, maxBytes: number): string {
   const buf = Buffer.from(s, 'utf8');

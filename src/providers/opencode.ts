@@ -61,9 +61,20 @@ export class OpenCodeAdapter implements ProviderAdapter {
       const stat = statSync(filePath);
       const raw = await readFile(filePath, 'utf8');
       const data = JSON.parse(raw) as OpenCodeSessionJson;
+      const sessionId = data.id ?? fileHash(filePath);
+
+      // Estimate event count from message directory
+      const storageRoot = expandTilde(STORAGE_ROOT);
+      const msgDir = join(storageRoot, 'message', sessionId);
+      let eventCount = 0;
+      if (existsSync(msgDir)) {
+        try {
+          eventCount = readdirSync(msgDir).filter((f) => f.startsWith('msg_') && f.endsWith('.json')).length;
+        } catch { /* ignore */ }
+      }
 
       return {
-        id: data.id ?? fileHash(filePath),
+        id: sessionId,
         provider: 'opencode',
         filePath,
         title: data.title ?? null,
@@ -73,7 +84,7 @@ export class OpenCodeAdapter implements ProviderAdapter {
         cwd: data.directory ?? null,
         git: null,
         events: [],
-        eventCount: 0,
+        eventCount,
         fileSizeBytes: stat.size,
         isHousekeeping: false,
         isFullyParsed: false,

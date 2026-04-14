@@ -63821,6 +63821,14 @@ function slugify(s) {
 function formatDate(d) {
   return d.toISOString().slice(0, 10);
 }
+function parseDateArg(value, flag) {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) {
+    console.error(`Invalid date for ${flag}: "${value}". Use ISO 8601 format, e.g. 2026-04-01`);
+    process.exit(1);
+  }
+  return d;
+}
 function capBytes(s, maxBytes) {
   const buf = Buffer.from(s, "utf8");
   if (buf.length <= maxBytes) return s;
@@ -64295,13 +64303,19 @@ var CodexAdapter = class {
       let cwd = null;
       let gitBranch = null;
       let model = null;
+      const toolNameMap = /* @__PURE__ */ new Map();
       for await (const raw of readJsonlFile(filePath)) {
         const rec = raw;
         if (!cwd && rec.cwd) cwd = rec.cwd;
         if (!gitBranch && rec.git_branch) gitBranch = rec.git_branch;
         if (!gitBranch && rec.git?.branch) gitBranch = rec.git.branch;
         if (!model && rec.model) model = rec.model;
-        const evs = parseCodexRecord(rec);
+        if (rec.tool_calls) {
+          for (const tc of rec.tool_calls) {
+            if (tc.id && tc.function?.name) toolNameMap.set(tc.id, tc.function.name);
+          }
+        }
+        const evs = parseCodexRecord(rec, toolNameMap);
         events2.push(...evs);
       }
       return {
@@ -64338,7 +64352,7 @@ function parseCodexFilename(filename) {
     startTime: null
   };
 }
-function parseCodexRecord(rec) {
+function parseCodexRecord(rec, toolNameMap) {
   const events2 = [];
   const ts = rec.timestamp ? safeDate2(rec.timestamp) : null;
   const raw = capBytes(JSON.stringify(rec), RAW_JSON_CAP2);
@@ -64377,12 +64391,14 @@ function parseCodexRecord(rec) {
   }
   if (rec.tool_call_id) {
     const text2 = extractCodexText(rec);
+    const resolvedToolName = rec.function?.name ?? toolNameMap?.get(rec.tool_call_id) ?? null;
     events2.push(makeEvent2({
       id: generateId2(rec.tool_call_id + raw),
       kind: "tool_result",
       timestamp: ts,
       role: "tool",
       text: null,
+      toolName: resolvedToolName,
       toolOutput: text2 ? capBytes(redactBase64Images(text2), RAW_JSON_CAP2) : null,
       messageId: rec.id ?? null,
       parentId: rec.parent_id ?? null,
@@ -64932,8 +64948,18 @@ var OpenCodeAdapter = class {
       const stat = (0, import_fs6.statSync)(filePath);
       const raw = await (0, import_promises2.readFile)(filePath, "utf8");
       const data = JSON.parse(raw);
+      const sessionId = data.id ?? fileHash3(filePath);
+      const storageRoot = expandTilde(STORAGE_ROOT);
+      const msgDir = (0, import_path2.join)(storageRoot, "message", sessionId);
+      let eventCount = 0;
+      if ((0, import_fs6.existsSync)(msgDir)) {
+        try {
+          eventCount = (0, import_fs6.readdirSync)(msgDir).filter((f) => f.startsWith("msg_") && f.endsWith(".json")).length;
+        } catch {
+        }
+      }
       return {
-        id: data.id ?? fileHash3(filePath),
+        id: sessionId,
         provider: "opencode",
         filePath,
         title: data.title ?? null,
@@ -64943,7 +64969,7 @@ var OpenCodeAdapter = class {
         cwd: data.directory ?? null,
         git: null,
         events: [],
-        eventCount: 0,
+        eventCount,
         fileSizeBytes: stat.size,
         isHousekeeping: false,
         isFullyParsed: false
@@ -65131,7 +65157,7 @@ var CopilotAdapter = class {
         cwd,
         git: null,
         events: [],
-        eventCount: 0,
+        eventCount: Math.round(stat.size / 200),
         fileSizeBytes: stat.size,
         isHousekeeping: false,
         isFullyParsed: false
@@ -65536,8 +65562,8 @@ function createScanCommand() {
         openCodeRoot: opts.openCodeRoot,
         copilotRoot: opts.copilotRoot,
         filter: {
-          since: opts.since ? new Date(opts.since) : void 0,
-          until: opts.until ? new Date(opts.until) : void 0
+          since: opts.since ? parseDateArg(opts.since, "--since") : void 0,
+          until: opts.until ? parseDateArg(opts.until, "--until") : void 0
         }
       });
       spinner.stop();
@@ -65621,8 +65647,8 @@ function createListCommand() {
           repo: opts.repo,
           worktree: opts.worktree,
           session: opts.session,
-          since: opts.since ? new Date(opts.since) : void 0,
-          until: opts.until ? new Date(opts.until) : void 0,
+          since: opts.since ? parseDateArg(opts.since, "--since") : void 0,
+          until: opts.until ? parseDateArg(opts.until, "--until") : void 0,
           noHousekeeping: opts.housekeeping === false
         }
       });
@@ -88119,8 +88145,9 @@ function createExportCommand() {
     };
     const spinner = ora("Scanning sessions\u2026").start();
     try {
+      const providerFilter = opts.provider;
       const { sessions: discovered, errors: scanErrors } = await discoverSessions({
-        providers: opts.provider,
+        providers: providerFilter,
         claudeRoot: opts.claudeRoot,
         codexRoot: opts.codexRoot,
         cursorRoot: opts.cursorRoot,
@@ -88128,12 +88155,12 @@ function createExportCommand() {
         openCodeRoot: opts.openCodeRoot,
         copilotRoot: opts.copilotRoot,
         filter: {
-          provider: opts.provider,
+          provider: providerFilter,
           repo: opts.repo,
           worktree: opts.worktree,
           session: opts.session,
-          since: opts.since ? new Date(opts.since) : void 0,
-          until: opts.until ? new Date(opts.until) : void 0,
+          since: opts.since ? parseDateArg(opts.since, "--since") : void 0,
+          until: opts.until ? parseDateArg(opts.until, "--until") : void 0,
           noHousekeeping: opts.housekeeping === false
         }
       });

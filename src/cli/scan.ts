@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import type { Provider } from '../schema.js';
 import { discoverSessions } from '../discovery.js';
+import { parseDateArg } from '../util/paths.js';
 
 export function createScanCommand(): Command {
   return new Command('scan')
@@ -30,8 +31,8 @@ export function createScanCommand(): Command {
           openCodeRoot: opts.openCodeRoot,
           copilotRoot: opts.copilotRoot,
           filter: {
-            since: opts.since ? new Date(opts.since) : undefined,
-            until: opts.until ? new Date(opts.until) : undefined,
+            since: opts.since ? parseDateArg(opts.since, '--since') : undefined,
+            until: opts.until ? parseDateArg(opts.until, '--until') : undefined,
           },
         });
 

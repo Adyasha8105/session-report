@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import type { Provider } from '../schema.js';
 import { discoverSessions } from '../discovery.js';
+import { parseDateArg } from '../util/paths.js';
 
 export function createListCommand(): Command {
   return new Command('list')
@@ -39,8 +40,8 @@ export function createListCommand(): Command {
             repo: opts.repo,
             worktree: opts.worktree,
             session: opts.session,
-            since: opts.since ? new Date(opts.since) : undefined,
-            until: opts.until ? new Date(opts.until) : undefined,
+            since: opts.since ? parseDateArg(opts.since, '--since') : undefined,
+            until: opts.until ? parseDateArg(opts.until, '--until') : undefined,
             noHousekeeping: opts.housekeeping === false,
           },
         });

@@ -102,6 +102,9 @@ export class CodexAdapter implements ProviderAdapter {
       let gitBranch: string | null = null;
       let model: string | null = null;
 
+      // Map tool_call_id → toolName so tool results can reference their tool name
+      const toolNameMap = new Map<string, string>();
+
       for await (const raw of readJsonlFile(filePath)) {
         const rec = raw as CodexRawRecord;
         if (!cwd && rec.cwd) cwd = rec.cwd;
@@ -109,7 +112,14 @@ export class CodexAdapter implements ProviderAdapter {
         if (!gitBranch && rec.git?.branch) gitBranch = rec.git.branch;
         if (!model && rec.model) model = rec.model;
 
-        const evs = parseCodexRecord(rec);
+        // Register tool call ids before parsing so tool results can look them up
+        if (rec.tool_calls) {
+          for (const tc of rec.tool_calls) {
+            if (tc.id && tc.function?.name) toolNameMap.set(tc.id, tc.function.name);
+          }
+        }
+
+        const evs = parseCodexRecord(rec, toolNameMap);
         events.push(...evs);
       }
 
@@ -156,7 +166,7 @@ function parseCodexFilename(filename: string): { sessionId: string; startTime: D
   };
 }
 
-function parseCodexRecord(rec: CodexRawRecord): SessionEvent[] {
+function parseCodexRecord(rec: CodexRawRecord, toolNameMap?: Map<string, string>): SessionEvent[] {
   const events: SessionEvent[] = [];
   const ts = rec.timestamp ? safeDate(rec.timestamp) : null;
   const raw = capBytes(JSON.stringify(rec), RAW_JSON_CAP);
@@ -204,12 +214,14 @@ function parseCodexRecord(rec: CodexRawRecord): SessionEvent[] {
   // Tool result record
   if (rec.tool_call_id) {
     const text = extractCodexText(rec);
+    const resolvedToolName = rec.function?.name ?? toolNameMap?.get(rec.tool_call_id) ?? null;
     events.push(makeEvent({
       id: generateId(rec.tool_call_id + raw),
       kind: 'tool_result',
       timestamp: ts,
       role: 'tool',
       text: null,
+      toolName: resolvedToolName,
       toolOutput: text ? capBytes(redactBase64Images(text), RAW_JSON_CAP) : null,
       messageId: rec.id ?? null,
       parentId: rec.parent_id ?? null,

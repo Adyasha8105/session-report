@@ -8,7 +8,7 @@ import { discoverSessions, parseSessions } from '../discovery.js';
 import { sessionToMarkdown, sessionsToMarkdown, DEFAULT_MARKDOWN_OPTIONS } from '../render/markdown.js';
 import { exportToPdf, PdfExporter } from '../export/pdf.js';
 import { exportToDocx } from '../export/docx.js';
-import { slugify, formatDate } from '../util/paths.js';
+import { slugify, formatDate, parseDateArg } from '../util/paths.js';
 
 export function createExportCommand(): Command {
   return new Command('export')
@@ -60,8 +60,9 @@ export function createExportCommand(): Command {
 
       try {
         // Step 1: Discover
+        const providerFilter = opts.provider as Provider[] | undefined;
         const { sessions: discovered, errors: scanErrors } = await discoverSessions({
-          providers: opts.provider as Provider[] | undefined,
+          providers: providerFilter,
           claudeRoot: opts.claudeRoot,
           codexRoot: opts.codexRoot,
           cursorRoot: opts.cursorRoot,
@@ -69,12 +70,12 @@ export function createExportCommand(): Command {
           openCodeRoot: opts.openCodeRoot,
           copilotRoot: opts.copilotRoot,
           filter: {
-            provider: opts.provider as Provider[] | undefined,
+            provider: providerFilter,
             repo: opts.repo,
             worktree: opts.worktree,
             session: opts.session,
-            since: opts.since ? new Date(opts.since) : undefined,
-            until: opts.until ? new Date(opts.until) : undefined,
+            since: opts.since ? parseDateArg(opts.since, '--since') : undefined,
+            until: opts.until ? parseDateArg(opts.until, '--until') : undefined,
             noHousekeeping: opts.housekeeping === false,
           },
         });
