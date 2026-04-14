@@ -9,7 +9,6 @@ await esbuild.build({
   format: 'cjs',
   outfile: 'dist/index.cjs',
   external: [
-    'pdfkit',
     'better-sqlite3',
   ],
   banner: {

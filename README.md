@@ -3,7 +3,7 @@
 Hit a rate limit? Switch tools without losing context.
 Need to share your work? Export everything into one document.
 
-`session-report` reads your AI coding sessions from **Claude Code**, **Codex CLI**, **Cursor**, **Gemini CLI**, **OpenCode**, and **GitHub Copilot** and exports them as Markdown, JSON, PDF, or DOCX — across any number of sessions, tools, or Git worktrees.
+`session-report` reads your AI coding sessions from **Claude Code**, **Codex CLI**, **Cursor**, **Gemini CLI**, **OpenCode**, and **GitHub Copilot** and exports them as Markdown, JSON, or DOCX — across any number of sessions, tools, or Git worktrees.
 
 ## What it solves
 
@@ -19,7 +19,7 @@ Need to submit or review what you built with AI? One command generates a clean, 
 npm install -g session-report
 session-report export               # exports as Markdown (default)
 session-report export --format json # exports as JSON
-session-report export --format pdf  # exports as PDF
+session-report export --format docx # exports as DOCX
 ```
 
 ## Installation
@@ -34,7 +34,7 @@ npm install -g session-report
 
 ```bash
 npx session-report export               # Markdown
-npx session-report export --format pdf  # PDF
+npx session-report export --format docx # DOCX
 ```
 
 
@@ -63,7 +63,6 @@ The copied text is ready to paste directly into Claude, ChatGPT, Gemini, or any 
 ```bash
 session-report export                          # Markdown (default)
 session-report export --format json            # JSON
-session-report export --format pdf             # PDF
 session-report export --format docx            # DOCX
 session-report export --output ./output        # custom output dir
 ```
@@ -80,7 +79,7 @@ session-report export --worktree
 ```bash
 session-report export --provider claude
 session-report export --provider codex  --format json
-session-report export --provider gemini --format pdf
+session-report export --provider gemini --format docx
 session-report export --provider opencode
 session-report export --provider copilot --format docx
 ```
@@ -106,7 +105,7 @@ session-report export --since 2026-04-01 --format json
 | `scan` | Summary of all detected sessions by provider |
 | `list` | Browse sessions with filters |
 | `copy` | Copy session context to clipboard for pasting into another AI tool |
-| `export` | Export sessions to Markdown, JSON, PDF, or DOCX |
+| `export` | Export sessions to Markdown, JSON, or DOCX |
 
 ## Flags
 
@@ -137,7 +136,7 @@ session-report export --since 2026-04-01 --format json
 
 | Flag | Description |
 |---|---|
-| `--format <format>` | `md` (default), `json`, `docx`, or `pdf` |
+| `--format <format>` | `md` (default), `json`, or `docx` |
 | `--mode <mode>` | `combined` (default), `single`, `split-provider`, `split-repo` |
 | `--output <dir>` | Output directory (default: `./session-reports`) |
 | `--include-tool-calls` | Include tool call/result events |

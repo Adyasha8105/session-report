@@ -6,14 +6,13 @@ import ora from 'ora';
 import type { Provider, ExportFormat, ExportMode, Session } from '../schema.js';
 import { discoverSessions, parseSessions } from '../discovery.js';
 import { sessionToMarkdown, sessionsToMarkdown, DEFAULT_MARKDOWN_OPTIONS } from '../render/markdown.js';
-import { exportToPdf, PdfExporter } from '../export/pdf.js';
 import { exportToDocx } from '../export/docx.js';
 import { slugify, formatDate, parseDateArg } from '../util/paths.js';
 
 export function createExportCommand(): Command {
   return new Command('export')
-    .description('Export sessions to PDF, DOCX, MD, or JSON')
-    .option('--format <format>', 'Output format: pdf, docx, md, or json', 'md')
+    .description('Export sessions to DOCX, MD, or JSON')
+    .option('--format <format>', 'Output format: docx, md, or json', 'md')
     .option('--mode <mode>', 'Export mode: single | combined | split-provider | split-repo', 'combined')
     .option('--output <dir>', 'Output directory', './session-reports')
     .option('-p, --provider <provider...>', 'Filter by provider: claude, codex, cursor, gemini, opencode, copilot')
@@ -39,8 +38,8 @@ export function createExportCommand(): Command {
       const format = opts.format as ExportFormat;
       const mode = opts.mode as ExportMode;
 
-      if (!['pdf', 'docx', 'md', 'json'].includes(format)) {
-        console.error(chalk.red(`Unknown format: ${format}. Use pdf, docx, md, or json.`));
+      if (!['docx', 'md', 'json'].includes(format)) {
+        console.error(chalk.red(`Unknown format: ${format}. Use docx, md, or json.`));
         process.exit(1);
       }
       if (!['single', 'combined', 'split-provider', 'split-repo'].includes(mode)) {
@@ -112,28 +111,18 @@ export function createExportCommand(): Command {
           outputFiles.push(outPath);
 
         } else if (mode === 'single') {
-          const exporter = format === 'pdf' ? new PdfExporter() : null;
-          if (exporter) await exporter.open();
-          try {
-            for (const session of sessions) {
-              const title = session.title ?? 'untitled';
-              const slug = slugify(title);
-              const filename = `${session.provider}-${session.id.slice(0, 8)}-${slug}.${format}`;
-              const outPath = join(opts.output, filename);
-              if (format === 'json') {
-                writeFileSync(outPath, sessionsToJson([session]), 'utf8');
-              } else {
-                const md = sessionToMarkdown(session, markdownOpts);
-                if (exporter) {
-                  await exporter.exportPage(md, outPath, { title: session.title ?? undefined });
-                } else {
-                  await exportDocument(md, outPath, format, title);
-                }
-              }
-              outputFiles.push(outPath);
+          for (const session of sessions) {
+            const title = session.title ?? 'untitled';
+            const slug = slugify(title);
+            const filename = `${session.provider}-${session.id.slice(0, 8)}-${slug}.${format}`;
+            const outPath = join(opts.output, filename);
+            if (format === 'json') {
+              writeFileSync(outPath, sessionsToJson([session]), 'utf8');
+            } else {
+              const md = sessionToMarkdown(session, markdownOpts);
+              await exportDocument(md, outPath, format, title);
             }
-          } finally {
-            if (exporter) await exporter.close();
+            outputFiles.push(outPath);
           }
 
         } else if (mode === 'split-provider') {
@@ -191,9 +180,7 @@ async function exportDocument(
   format: ExportFormat,
   title: string
 ): Promise<void> {
-  if (format === 'pdf') {
-    await exportToPdf(md, outputPath, { title });
-  } else if (format === 'docx') {
+  if (format === 'docx') {
     await exportToDocx(md, outputPath);
   } else {
     // md — just write the markdown string
