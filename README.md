@@ -14,21 +14,34 @@ A command-line tool that aggregates AI coding assistant session histories from *
 
 ## Installation
 
-### Run without cloning (recommended)
+### Homebrew (recommended)
+
+```bash
+brew tap Adyasha8105/session-report
+brew install session-report
+```
+
+Then use it from any terminal:
+
+```bash
+session-report scan
+session-report list --provider claude
+session-report export --format pdf
+```
+
+> For PDF export, also run: `npx playwright install chromium`
+> DOCX export works immediately with no extra steps.
+
+### npx (no install)
 
 ```bash
 npx github:Adyasha8105/session-report scan
-npx github:Adyasha8105/session-report list --provider claude
-npx github:Adyasha8105/session-report export --format pdf
 ```
 
-> Requires Node.js >= 20. On first run, npm will install dependencies automatically.
-
-### Install globally
+### npm global
 
 ```bash
 npm install -g github:Adyasha8105/session-report
-session-report scan
 ```
 
 ### Clone and build locally
