@@ -1,0 +1,6 @@
+dist/index.cjs.map
+src/
+tests/
+scripts/
+tsconfig.json
+*.test.ts
