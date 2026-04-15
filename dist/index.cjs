@@ -8055,8 +8055,8 @@ var require_pattern = __commonJS({
     }
     exports2.endsWithSlashGlobStar = endsWithSlashGlobStar;
     function isAffectDepthOfReadingPattern(pattern) {
-      const basename4 = path.basename(pattern);
-      return endsWithSlashGlobStar(pattern) || isStaticPattern(basename4);
+      const basename5 = path.basename(pattern);
+      return endsWithSlashGlobStar(pattern) || isStaticPattern(basename5);
     }
     exports2.isAffectDepthOfReadingPattern = isAffectDepthOfReadingPattern;
     function expandPatternsWithBraceExpansion(patterns) {
@@ -11852,6 +11852,8 @@ function ora(options2) {
 
 // src/discovery.ts
 var import_fs9 = require("fs");
+var import_os2 = require("os");
+var import_path5 = require("path");
 var import_fast_glob = __toESM(require_out4(), 1);
 
 // node_modules/yocto-queue/index.js
@@ -12688,13 +12690,14 @@ function generateId2(seed) {
 
 // src/providers/cursor.ts
 var import_fs4 = require("fs");
+var import_path2 = require("path");
 var import_crypto3 = require("crypto");
 var RAW_JSON_CAP3 = 8192;
 var CursorAdapter = class {
   provider = "cursor";
   async scanFile(filePath) {
     try {
-      if (filePath.endsWith("store.db")) {
+      if (filePath.endsWith("store.db") || filePath.endsWith("state.vscdb")) {
         return await this.scanSqliteFile(filePath);
       }
       return await this.scanJsonlFile(filePath);
@@ -12704,7 +12707,7 @@ var CursorAdapter = class {
   }
   async parseFile(filePath) {
     try {
-      if (filePath.endsWith("store.db")) {
+      if (filePath.endsWith("store.db") || filePath.endsWith("state.vscdb")) {
         return await this.parseSqliteFile(filePath);
       }
       return await this.parseJsonlFile(filePath);
@@ -12936,11 +12939,9 @@ function extractCursorSessionId(filePath) {
   return (0, import_crypto3.createHash)("sha1").update(filePath).digest("hex").slice(0, 16);
 }
 function extractCursorSessionIdFromDb(filePath) {
-  const parts = filePath.split("/");
-  const storeIdx = parts.findIndex((p) => p === "store.db");
-  if (storeIdx > 0) {
-    const candidate = parts[storeIdx - 1];
-    if (candidate) return candidate;
+  const candidate = (0, import_path2.basename)((0, import_path2.dirname)(filePath));
+  if (candidate && /^[a-f0-9-]{8,}$/i.test(candidate)) {
+    return candidate;
   }
   return (0, import_crypto3.createHash)("sha1").update(filePath).digest("hex").slice(0, 16);
 }
@@ -13164,7 +13165,7 @@ function generateId4(seed) {
 
 // src/providers/opencode.ts
 var import_fs6 = require("fs");
-var import_path2 = require("path");
+var import_path3 = require("path");
 var import_crypto5 = require("crypto");
 var import_promises2 = require("fs/promises");
 var RAW_JSON_CAP5 = 8192;
@@ -13178,7 +13179,7 @@ var OpenCodeAdapter = class {
       const data = JSON.parse(raw);
       const sessionId = data.id ?? fileHash3(filePath);
       const storageRoot = expandTilde(STORAGE_ROOT);
-      const msgDir = (0, import_path2.join)(storageRoot, "message", sessionId);
+      const msgDir = (0, import_path3.join)(storageRoot, "message", sessionId);
       let eventCount = 0;
       if ((0, import_fs6.existsSync)(msgDir)) {
         try {
@@ -13215,11 +13216,11 @@ var OpenCodeAdapter = class {
       const events2 = [];
       let model = null;
       const storageRoot = expandTilde(STORAGE_ROOT);
-      const msgDir = (0, import_path2.join)(storageRoot, "message", sessionId);
+      const msgDir = (0, import_path3.join)(storageRoot, "message", sessionId);
       if ((0, import_fs6.existsSync)(msgDir)) {
         const msgFiles = (0, import_fs6.readdirSync)(msgDir).filter((f) => f.startsWith("msg_") && f.endsWith(".json")).sort();
         for (const msgFile of msgFiles) {
-          const msgPath = (0, import_path2.join)(msgDir, msgFile);
+          const msgPath = (0, import_path3.join)(msgDir, msgFile);
           try {
             const msgRaw = await (0, import_promises2.readFile)(msgPath, "utf8");
             const msg = JSON.parse(msgRaw);
@@ -13273,12 +13274,12 @@ var OpenCodeAdapter = class {
 };
 async function loadParts(storageRoot, messageId) {
   const parts = [];
-  const partDir = (0, import_path2.join)(storageRoot, "part", messageId);
+  const partDir = (0, import_path3.join)(storageRoot, "part", messageId);
   if ((0, import_fs6.existsSync)(partDir)) {
     const files = (0, import_fs6.readdirSync)(partDir).filter((f) => f.endsWith(".json")).sort();
     for (const f of files) {
       try {
-        const raw = await (0, import_promises2.readFile)((0, import_path2.join)(partDir, f), "utf8");
+        const raw = await (0, import_promises2.readFile)((0, import_path3.join)(partDir, f), "utf8");
         parts.push(JSON.parse(raw));
       } catch {
       }
@@ -13544,7 +13545,7 @@ function generateId6(seed) {
 
 // src/git.ts
 var import_fs8 = require("fs");
-var import_path3 = require("path");
+var import_path4 = require("path");
 function detectGitContext(cwd) {
   if (!cwd) {
     return emptyContext();
@@ -13553,11 +13554,11 @@ function detectGitContext(cwd) {
   if (!repoRoot) {
     return emptyContext();
   }
-  const gitPath = (0, import_path3.join)(repoRoot, ".git");
+  const gitPath = (0, import_path4.join)(repoRoot, ".git");
   const isWorktree = isGitFile(gitPath);
   const worktreeRoot = isWorktree ? resolveWorktreeRoot(gitPath) : null;
   const branch = readBranch(repoRoot);
-  const repoName = (0, import_path3.basename)(worktreeRoot ?? repoRoot);
+  const repoName = (0, import_path4.basename)(worktreeRoot ?? repoRoot);
   return {
     repoRoot,
     repoName,
@@ -13578,9 +13579,9 @@ function emptyContext() {
 function findGitRoot(dir) {
   let current = dir;
   for (; ; ) {
-    const candidate = (0, import_path3.join)(current, ".git");
+    const candidate = (0, import_path4.join)(current, ".git");
     if ((0, import_fs8.existsSync)(candidate)) return current;
-    const parent = (0, import_path3.dirname)(current);
+    const parent = (0, import_path4.dirname)(current);
     if (parent === current) return null;
     current = parent;
   }
@@ -13598,8 +13599,8 @@ function resolveWorktreeRoot(gitFilePath) {
     const match = content.match(/^gitdir:\s*(.+)$/m);
     if (!match || !match[1]) return null;
     const gitdirPath = match[1].trim();
-    const repoGitDir = (0, import_path3.dirname)((0, import_path3.dirname)(gitdirPath));
-    const repoRoot = (0, import_path3.dirname)(repoGitDir);
+    const repoGitDir = (0, import_path4.dirname)((0, import_path4.dirname)(gitdirPath));
+    const repoRoot = (0, import_path4.dirname)(repoGitDir);
     return (0, import_fs8.existsSync)(repoGitDir) ? repoRoot : null;
   } catch {
     return null;
@@ -13607,7 +13608,7 @@ function resolveWorktreeRoot(gitFilePath) {
 }
 function readBranch(repoRoot) {
   try {
-    const headPath = (0, import_path3.join)(repoRoot, ".git", "HEAD");
+    const headPath = (0, import_path4.join)(repoRoot, ".git", "HEAD");
     const content = (0, import_fs8.readFileSync)(headPath, "utf8").trim();
     const refMatch = content.match(/^ref:\s*refs\/heads\/(.+)$/);
     if (refMatch && refMatch[1]) return refMatch[1];
@@ -13622,6 +13623,18 @@ function readBranch(repoRoot) {
 
 // src/discovery.ts
 var SCAN_CONCURRENCY = 8;
+function getCursorAppDataPath() {
+  const home = (0, import_os2.homedir)();
+  if (process.platform === "darwin") {
+    return (0, import_path5.join)(home, "Library", "Application Support", "Cursor");
+  }
+  if (process.platform === "win32") {
+    const appData = process.env.APPDATA;
+    return appData ? (0, import_path5.join)(appData, "Cursor") : null;
+  }
+  const xdg = process.env.XDG_CONFIG_HOME;
+  return (0, import_path5.join)(xdg ?? (0, import_path5.join)(home, ".config"), "Cursor");
+}
 var claudeAdapter = new ClaudeAdapter();
 var codexAdapter = new CodexAdapter();
 var cursorAdapter = new CursorAdapter();
@@ -13635,6 +13648,7 @@ async function discoverSessions(config = {}) {
   const claudeRoot = expandTilde(config.claudeRoot ?? "~/.claude");
   const codexRoot = expandTilde(config.codexRoot ?? "~/.codex");
   const cursorRoot = expandTilde(config.cursorRoot ?? "~/.cursor");
+  const cursorAppDataRoot = config.cursorAppDataRoot ? expandTilde(config.cursorAppDataRoot) : getCursorAppDataPath();
   const geminiRoot = expandTilde(config.geminiRoot ?? "~/.gemini");
   const openCodeRoot = expandTilde(config.openCodeRoot ?? "~/.local/share/opencode");
   const copilotRoot = expandTilde(config.copilotRoot ?? "~/.copilot");
@@ -13655,14 +13669,23 @@ async function discoverSessions(config = {}) {
       allFiles.push({ filePath: f, provider: "codex" });
     }
   }
-  if (providers.includes("cursor") && (0, import_fs9.existsSync)(cursorRoot)) {
-    const patterns = [
-      `${cursorRoot}/projects/*/agent-transcripts/**/*.jsonl`,
-      `${cursorRoot}/chats/**/store.db`
-    ];
-    const files = await (0, import_fast_glob.default)(patterns, { onlyFiles: true, absolute: true, suppressErrors: true });
-    for (const f of files) {
-      allFiles.push({ filePath: f, provider: "cursor" });
+  if (providers.includes("cursor")) {
+    const cursorPatterns = [];
+    if ((0, import_fs9.existsSync)(cursorRoot)) {
+      cursorPatterns.push(
+        `${cursorRoot}/projects/*/agent-transcripts/**/*.jsonl`,
+        `${cursorRoot}/chats/**/store.db`
+      );
+    }
+    if (cursorAppDataRoot && (0, import_fs9.existsSync)(cursorAppDataRoot)) {
+      const appDataGlob = cursorAppDataRoot.replace(/\\/g, "/");
+      cursorPatterns.push(`${appDataGlob}/User/globalStorage/state.vscdb`);
+    }
+    if (cursorPatterns.length > 0) {
+      const files = await (0, import_fast_glob.default)(cursorPatterns, { onlyFiles: true, absolute: true, suppressErrors: true });
+      for (const f of files) {
+        allFiles.push({ filePath: f, provider: "cursor" });
+      }
     }
   }
   if (providers.includes("gemini") && (0, import_fs9.existsSync)(geminiRoot)) {
@@ -13940,7 +13963,7 @@ function truncate(s, max2) {
 
 // src/cli/export.ts
 var import_fs11 = require("fs");
-var import_path5 = require("path");
+var import_path7 = require("path");
 
 // src/render/markdown.ts
 var DEFAULT_MARKDOWN_OPTIONS = {
@@ -14092,7 +14115,7 @@ function escapeMarkdown(s) {
 
 // src/export/docx.ts
 var import_fs10 = require("fs");
-var import_path4 = require("path");
+var import_path6 = require("path");
 
 // node_modules/docx/dist/index.mjs
 var __defProp2 = Object.defineProperty;
@@ -18771,7 +18794,7 @@ function requireBuffer_list() {
       }
     }, {
       key: "join",
-      value: function join4(s) {
+      value: function join6(s) {
         if (this.length === 0) return "";
         var p = this.head;
         var ret = "" + p.data;
@@ -35928,7 +35951,7 @@ async function exportToDocx(markdownContent, outputPath) {
     }
   });
   const buffer2 = await Packer.toBuffer(doc);
-  (0, import_fs10.mkdirSync)((0, import_path4.dirname)(outputPath), { recursive: true });
+  (0, import_fs10.mkdirSync)((0, import_path6.dirname)(outputPath), { recursive: true });
   (0, import_fs10.writeFileSync)(outputPath, buffer2);
 }
 function tokensToDocxElements(tokens) {
@@ -36172,7 +36195,7 @@ function createExportCommand() {
       const outputFiles = [];
       if (mode === "combined") {
         const filename = `combined-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
-        const outPath = (0, import_path5.join)(opts.output, filename);
+        const outPath = (0, import_path7.join)(opts.output, filename);
         if (format === "json") {
           (0, import_fs11.writeFileSync)(outPath, sessionsToJson(sessions), "utf8");
         } else {
@@ -36185,7 +36208,7 @@ function createExportCommand() {
           const title = session.title ?? "untitled";
           const slug = slugify(title);
           const filename = `${session.provider}-${session.id.slice(0, 8)}-${slug}.${format}`;
-          const outPath = (0, import_path5.join)(opts.output, filename);
+          const outPath = (0, import_path7.join)(opts.output, filename);
           if (format === "json") {
             (0, import_fs11.writeFileSync)(outPath, sessionsToJson([session]), "utf8");
           } else {
@@ -36198,7 +36221,7 @@ function createExportCommand() {
         const byProvider = groupBy(sessions, (s) => s.provider);
         for (const [provider, group] of byProvider) {
           const filename = `${provider}-sessions-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
-          const outPath = (0, import_path5.join)(opts.output, filename);
+          const outPath = (0, import_path7.join)(opts.output, filename);
           if (format === "json") {
             (0, import_fs11.writeFileSync)(outPath, sessionsToJson(group), "utf8");
           } else {
@@ -36212,7 +36235,7 @@ function createExportCommand() {
         for (const [repo, group] of byRepo) {
           const slug = slugify(repo);
           const filename = `${slug}-sessions-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
-          const outPath = (0, import_path5.join)(opts.output, filename);
+          const outPath = (0, import_path7.join)(opts.output, filename);
           if (format === "json") {
             (0, import_fs11.writeFileSync)(outPath, sessionsToJson(group), "utf8");
           } else {

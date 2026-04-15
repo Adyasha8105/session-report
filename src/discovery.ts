@@ -1,5 +1,6 @@
 import { statSync, existsSync } from 'fs';
 import { homedir } from 'os';
+import { join } from 'path';
 import fg from 'fast-glob';
 import pLimit from 'p-limit';
 import type { Session, Provider, FilterOptions } from './schema.js';
@@ -19,6 +20,7 @@ export interface DiscoveryConfig {
   claudeRoot?: string;
   codexRoot?: string;
   cursorRoot?: string;
+  cursorAppDataRoot?: string;
   geminiRoot?: string;
   openCodeRoot?: string;
   copilotRoot?: string;
@@ -31,6 +33,26 @@ export interface DiscoveryResult {
 }
 
 const SCAN_CONCURRENCY = 8;
+
+/**
+ * Returns the platform-specific Cursor app data directory (where workspaceStorage lives).
+ * - macOS:   ~/Library/Application Support/Cursor
+ * - Windows: %APPDATA%\Cursor
+ * - Linux:   $XDG_CONFIG_HOME/Cursor or ~/.config/Cursor
+ */
+function getCursorAppDataPath(): string | null {
+  const home = homedir();
+  if (process.platform === 'darwin') {
+    return join(home, 'Library', 'Application Support', 'Cursor');
+  }
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA;
+    return appData ? join(appData, 'Cursor') : null;
+  }
+  // Linux / other
+  const xdg = process.env.XDG_CONFIG_HOME;
+  return join(xdg ?? join(home, '.config'), 'Cursor');
+}
 
 const claudeAdapter = new ClaudeAdapter();
 const codexAdapter = new CodexAdapter();
@@ -48,6 +70,9 @@ export async function discoverSessions(config: DiscoveryConfig = {}): Promise<Di
   const claudeRoot = expandTilde(config.claudeRoot ?? '~/.claude');
   const codexRoot = expandTilde(config.codexRoot ?? '~/.codex');
   const cursorRoot = expandTilde(config.cursorRoot ?? '~/.cursor');
+  const cursorAppDataRoot = config.cursorAppDataRoot
+    ? expandTilde(config.cursorAppDataRoot)
+    : getCursorAppDataPath();
   const geminiRoot = expandTilde(config.geminiRoot ?? '~/.gemini');
   const openCodeRoot = expandTilde(config.openCodeRoot ?? '~/.local/share/opencode');
   const copilotRoot = expandTilde(config.copilotRoot ?? '~/.copilot');
@@ -71,14 +96,25 @@ export async function discoverSessions(config: DiscoveryConfig = {}): Promise<Di
     }
   }
 
-  if (providers.includes('cursor') && existsSync(cursorRoot)) {
-    const patterns = [
-      `${cursorRoot}/projects/*/agent-transcripts/**/*.jsonl`,
-      `${cursorRoot}/chats/**/store.db`,
-    ];
-    const files = await fg(patterns, { onlyFiles: true, absolute: true, suppressErrors: true });
-    for (const f of files) {
-      allFiles.push({ filePath: f, provider: 'cursor' });
+  if (providers.includes('cursor')) {
+    const cursorPatterns: string[] = [];
+    if (existsSync(cursorRoot)) {
+      cursorPatterns.push(
+        `${cursorRoot}/projects/*/agent-transcripts/**/*.jsonl`,
+        `${cursorRoot}/chats/**/store.db`,
+      );
+    }
+    if (cursorAppDataRoot && existsSync(cursorAppDataRoot)) {
+      // Normalize separators for fast-glob (important on Windows)
+      const appDataGlob = cursorAppDataRoot.replace(/\\/g, '/');
+      // globalStorage/state.vscdb holds the chat panel (Ctrl+L) history
+      cursorPatterns.push(`${appDataGlob}/User/globalStorage/state.vscdb`);
+    }
+    if (cursorPatterns.length > 0) {
+      const files = await fg(cursorPatterns, { onlyFiles: true, absolute: true, suppressErrors: true });
+      for (const f of files) {
+        allFiles.push({ filePath: f, provider: 'cursor' });
+      }
     }
   }
 

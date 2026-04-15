@@ -51,7 +51,7 @@ export class CursorAdapter implements ProviderAdapter {
 
   async scanFile(filePath: string): Promise<Session> {
     try {
-      if (filePath.endsWith('store.db')) {
+      if (filePath.endsWith('store.db') || filePath.endsWith('state.vscdb')) {
         return await this.scanSqliteFile(filePath);
       }
       return await this.scanJsonlFile(filePath);
@@ -62,7 +62,7 @@ export class CursorAdapter implements ProviderAdapter {
 
   async parseFile(filePath: string): Promise<Session> {
     try {
-      if (filePath.endsWith('store.db')) {
+      if (filePath.endsWith('store.db') || filePath.endsWith('state.vscdb')) {
         return await this.parseSqliteFile(filePath);
       }
       return await this.parseJsonlFile(filePath);
@@ -329,13 +329,15 @@ function extractCursorSessionId(filePath: string): string {
   return createHash('sha1').update(filePath).digest('hex').slice(0, 16);
 }
 
-/** Extract session ID from SQLite path: .../chats/<md5>/<sessionUUID>/store.db */
+/**
+ * Extract session ID from SQLite path.
+ * - store.db:    .../chats/<md5>/<sessionUUID>/store.db  → sessionUUID
+ * - state.vscdb: .../workspaceStorage/<hash>/state.vscdb → hash
+ */
 function extractCursorSessionIdFromDb(filePath: string): string {
-  const parts = filePath.split('/');
-  const storeIdx = parts.findIndex((p) => p === 'store.db');
-  if (storeIdx > 0) {
-    const candidate = parts[storeIdx - 1];
-    if (candidate) return candidate;
+  const candidate = basename(dirname(filePath));
+  if (candidate && /^[a-f0-9-]{8,}$/i.test(candidate)) {
+    return candidate;
   }
   return createHash('sha1').update(filePath).digest('hex').slice(0, 16);
 }
