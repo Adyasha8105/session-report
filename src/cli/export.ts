@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -98,12 +98,13 @@ export function createExportCommand(): Command {
         spinner.text = 'Rendering…';
 
         // Step 3: Export
-        mkdirSync(opts.output, { recursive: true });
+        const outputDir = resolve(opts.output);
+        mkdirSync(outputDir, { recursive: true });
         const outputFiles: string[] = [];
 
         if (mode === 'combined') {
           const filename = `combined-${formatDate(new Date())}.${format}`;
-          const outPath = join(opts.output, filename);
+          const outPath = join(outputDir, filename);
           if (format === 'json') {
             writeFileSync(outPath, sessionsToJson(sessions), 'utf8');
           } else {
@@ -117,7 +118,7 @@ export function createExportCommand(): Command {
             const title = session.title ?? 'untitled';
             const slug = slugify(title);
             const filename = `${session.provider}-${session.id.slice(0, 8)}-${slug}.${format}`;
-            const outPath = join(opts.output, filename);
+            const outPath = join(outputDir, filename);
             if (format === 'json') {
               writeFileSync(outPath, sessionsToJson([session]), 'utf8');
             } else {
@@ -131,7 +132,7 @@ export function createExportCommand(): Command {
           const byProvider = groupBy(sessions, (s) => s.provider);
           for (const [provider, group] of byProvider) {
             const filename = `${provider}-sessions-${formatDate(new Date())}.${format}`;
-            const outPath = join(opts.output, filename);
+            const outPath = join(outputDir, filename);
             if (format === 'json') {
               writeFileSync(outPath, sessionsToJson(group), 'utf8');
             } else {
@@ -146,7 +147,7 @@ export function createExportCommand(): Command {
           for (const [repo, group] of byRepo) {
             const slug = slugify(repo);
             const filename = `${slug}-sessions-${formatDate(new Date())}.${format}`;
-            const outPath = join(opts.output, filename);
+            const outPath = join(outputDir, filename);
             if (format === 'json') {
               writeFileSync(outPath, sessionsToJson(group), 'utf8');
             } else {

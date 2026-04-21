@@ -1,3 +1,4 @@
+import { basename } from 'path';
 import type { EventKind, Session, SessionEvent } from './schema.js';
 
 /**
@@ -110,7 +111,8 @@ export function filterSessions(
       if (!opts.provider.includes(s.provider)) return false;
     }
     if (opts.repo) {
-      const name = s.git?.repoName ?? '';
+      // Prefer git repo name; fall back to cwd folder name for non-git projects
+      const name = s.git?.repoName ?? (s.cwd ? basename(s.cwd) : '');
       if (!name.toLowerCase().includes(opts.repo.toLowerCase())) return false;
     }
     if (opts.worktree) {

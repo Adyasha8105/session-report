@@ -8055,8 +8055,8 @@ var require_pattern = __commonJS({
     }
     exports2.endsWithSlashGlobStar = endsWithSlashGlobStar;
     function isAffectDepthOfReadingPattern(pattern) {
-      const basename5 = path.basename(pattern);
-      return endsWithSlashGlobStar(pattern) || isStaticPattern(basename5);
+      const basename6 = path.basename(pattern);
+      return endsWithSlashGlobStar(pattern) || isStaticPattern(basename6);
     }
     exports2.isAffectDepthOfReadingPattern = isAffectDepthOfReadingPattern;
     function expandPatternsWithBraceExpansion(patterns) {
@@ -9199,41 +9199,41 @@ var require_queue = __commonJS({
       queue2.drained = drained;
       return queue2;
       function push(value) {
-        var p = new Promise(function(resolve, reject) {
+        var p = new Promise(function(resolve2, reject) {
           pushCb(value, function(err, result) {
             if (err) {
               reject(err);
               return;
             }
-            resolve(result);
+            resolve2(result);
           });
         });
         p.catch(noop2);
         return p;
       }
       function unshift(value) {
-        var p = new Promise(function(resolve, reject) {
+        var p = new Promise(function(resolve2, reject) {
           unshiftCb(value, function(err, result) {
             if (err) {
               reject(err);
               return;
             }
-            resolve(result);
+            resolve2(result);
           });
         });
         p.catch(noop2);
         return p;
       }
       function drained() {
-        var p = new Promise(function(resolve) {
+        var p = new Promise(function(resolve2) {
           process.nextTick(function() {
             if (queue2.idle()) {
-              resolve();
+              resolve2();
             } else {
               var previousDrain = queue2.drain;
               queue2.drain = function() {
                 if (typeof previousDrain === "function") previousDrain();
-                resolve();
+                resolve2();
                 queue2.drain = previousDrain;
               };
             }
@@ -9719,9 +9719,9 @@ var require_stream3 = __commonJS({
         });
       }
       _getStat(filepath) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve2, reject) => {
           this._stat(filepath, this._fsStatSettings, (error, stats) => {
-            return error === null ? resolve(stats) : reject(error);
+            return error === null ? resolve2(stats) : reject(error);
           });
         });
       }
@@ -9745,10 +9745,10 @@ var require_async5 = __commonJS({
         this._readerStream = new stream_1.default(this._settings);
       }
       dynamic(root, options2) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve2, reject) => {
           this._walkAsync(root, options2, (error, entries) => {
             if (error === null) {
-              resolve(entries);
+              resolve2(entries);
             } else {
               reject(error);
             }
@@ -9758,10 +9758,10 @@ var require_async5 = __commonJS({
       async static(patterns, options2) {
         const entries = [];
         const stream = this._readerStream.static(patterns, options2);
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve2, reject) => {
           stream.once("error", reject);
           stream.on("data", (entry) => entries.push(entry));
-          stream.once("end", () => resolve(entries));
+          stream.once("end", () => resolve2(entries));
         });
       }
     };
@@ -11853,7 +11853,7 @@ function ora(options2) {
 // src/discovery.ts
 var import_fs9 = require("fs");
 var import_os2 = require("os");
-var import_path5 = require("path");
+var import_path6 = require("path");
 var import_fast_glob = __toESM(require_out4(), 1);
 
 // node_modules/yocto-queue/index.js
@@ -11937,20 +11937,20 @@ function pLimit(concurrency) {
     activeCount--;
     resumeNext();
   };
-  const run = async (function_, resolve, arguments_) => {
+  const run = async (function_, resolve2, arguments_) => {
     const result = (async () => function_(...arguments_))();
-    resolve(result);
+    resolve2(result);
     try {
       await result;
     } catch {
     }
     next();
   };
-  const enqueue = (function_, resolve, arguments_) => {
+  const enqueue = (function_, resolve2, arguments_) => {
     new Promise((internalResolve) => {
       queue2.enqueue(internalResolve);
     }).then(
-      run.bind(void 0, function_, resolve, arguments_)
+      run.bind(void 0, function_, resolve2, arguments_)
     );
     (async () => {
       await Promise.resolve();
@@ -11959,8 +11959,8 @@ function pLimit(concurrency) {
       }
     })();
   };
-  const generator = (function_, ...arguments_) => new Promise((resolve) => {
-    enqueue(function_, resolve, arguments_);
+  const generator = (function_, ...arguments_) => new Promise((resolve2) => {
+    enqueue(function_, resolve2, arguments_);
   });
   Object.defineProperties(generator, {
     activeCount: {
@@ -12075,6 +12075,7 @@ function redactBase64Images(s) {
 }
 
 // src/normalize.ts
+var import_path = require("path");
 function normalizeEventKind(type2, role) {
   const t = type2?.toLowerCase().trim();
   const r = role?.toLowerCase().trim();
@@ -12147,7 +12148,7 @@ function filterSessions(sessions, opts) {
       if (!opts.provider.includes(s.provider)) return false;
     }
     if (opts.repo) {
-      const name = s.git?.repoName ?? "";
+      const name = s.git?.repoName ?? (s.cwd ? (0, import_path.basename)(s.cwd) : "");
       if (!name.toLowerCase().includes(opts.repo.toLowerCase())) return false;
     }
     if (opts.worktree) {
@@ -12479,7 +12480,7 @@ function generateId(seed) {
 
 // src/providers/codex.ts
 var import_fs3 = require("fs");
-var import_path = require("path");
+var import_path2 = require("path");
 var import_crypto2 = require("crypto");
 var RAW_JSON_CAP2 = 8192;
 var CodexAdapter = class {
@@ -12487,7 +12488,7 @@ var CodexAdapter = class {
   async scanFile(filePath) {
     try {
       const stat = (0, import_fs3.statSync)(filePath);
-      const { sessionId, startTime } = parseCodexFilename((0, import_path.basename)(filePath));
+      const { sessionId, startTime } = parseCodexFilename((0, import_path2.basename)(filePath));
       let cwd = null;
       let gitBranch = null;
       let model = null;
@@ -12528,7 +12529,7 @@ var CodexAdapter = class {
   async parseFile(filePath) {
     try {
       const stat = (0, import_fs3.statSync)(filePath);
-      const { sessionId, startTime } = parseCodexFilename((0, import_path.basename)(filePath));
+      const { sessionId, startTime } = parseCodexFilename((0, import_path2.basename)(filePath));
       const events2 = [];
       let cwd = null;
       let gitBranch = null;
@@ -12690,7 +12691,7 @@ function generateId2(seed) {
 
 // src/providers/cursor.ts
 var import_fs4 = require("fs");
-var import_path2 = require("path");
+var import_path3 = require("path");
 var import_crypto3 = require("crypto");
 var RAW_JSON_CAP3 = 8192;
 var CursorAdapter = class {
@@ -12939,7 +12940,7 @@ function extractCursorSessionId(filePath) {
   return (0, import_crypto3.createHash)("sha1").update(filePath).digest("hex").slice(0, 16);
 }
 function extractCursorSessionIdFromDb(filePath) {
-  const candidate = (0, import_path2.basename)((0, import_path2.dirname)(filePath));
+  const candidate = (0, import_path3.basename)((0, import_path3.dirname)(filePath));
   if (candidate && /^[a-f0-9-]{8,}$/i.test(candidate)) {
     return candidate;
   }
@@ -13165,11 +13166,16 @@ function generateId4(seed) {
 
 // src/providers/opencode.ts
 var import_fs6 = require("fs");
-var import_path3 = require("path");
+var import_path4 = require("path");
 var import_crypto5 = require("crypto");
 var import_promises2 = require("fs/promises");
 var RAW_JSON_CAP5 = 8192;
 var STORAGE_ROOT = "~/.local/share/opencode/storage";
+var SAFE_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/;
+function safeId(id) {
+  if (!SAFE_ID_RE.test(id)) throw new Error(`Unsafe session/message ID: ${JSON.stringify(id)}`);
+  return id;
+}
 var OpenCodeAdapter = class {
   provider = "opencode";
   async scanFile(filePath) {
@@ -13177,9 +13183,9 @@ var OpenCodeAdapter = class {
       const stat = (0, import_fs6.statSync)(filePath);
       const raw = await (0, import_promises2.readFile)(filePath, "utf8");
       const data = JSON.parse(raw);
-      const sessionId = data.id ?? fileHash3(filePath);
+      const sessionId = safeId(data.id ?? fileHash3(filePath));
       const storageRoot = expandTilde(STORAGE_ROOT);
-      const msgDir = (0, import_path3.join)(storageRoot, "message", sessionId);
+      const msgDir = (0, import_path4.join)(storageRoot, "message", sessionId);
       let eventCount = 0;
       if ((0, import_fs6.existsSync)(msgDir)) {
         try {
@@ -13212,15 +13218,15 @@ var OpenCodeAdapter = class {
       const stat = (0, import_fs6.statSync)(filePath);
       const raw = await (0, import_promises2.readFile)(filePath, "utf8");
       const data = JSON.parse(raw);
-      const sessionId = data.id ?? fileHash3(filePath);
+      const sessionId = safeId(data.id ?? fileHash3(filePath));
       const events2 = [];
       let model = null;
       const storageRoot = expandTilde(STORAGE_ROOT);
-      const msgDir = (0, import_path3.join)(storageRoot, "message", sessionId);
+      const msgDir = (0, import_path4.join)(storageRoot, "message", sessionId);
       if ((0, import_fs6.existsSync)(msgDir)) {
         const msgFiles = (0, import_fs6.readdirSync)(msgDir).filter((f) => f.startsWith("msg_") && f.endsWith(".json")).sort();
         for (const msgFile of msgFiles) {
-          const msgPath = (0, import_path3.join)(msgDir, msgFile);
+          const msgPath = (0, import_path4.join)(msgDir, msgFile);
           try {
             const msgRaw = await (0, import_promises2.readFile)(msgPath, "utf8");
             const msg = JSON.parse(msgRaw);
@@ -13229,7 +13235,7 @@ var OpenCodeAdapter = class {
             }
             const kind = normalizeEventKind(void 0, msg.role);
             const ts = msg.time?.created ? new Date(msg.time.created) : null;
-            const msgId = msg.id ?? fileHash3(msgPath);
+            const msgId = safeId(msg.id ?? fileHash3(msgPath));
             const parts = await loadParts(storageRoot, msgId);
             if (parts.length > 0) {
               for (const part of parts) {
@@ -13274,12 +13280,12 @@ var OpenCodeAdapter = class {
 };
 async function loadParts(storageRoot, messageId) {
   const parts = [];
-  const partDir = (0, import_path3.join)(storageRoot, "part", messageId);
+  const partDir = (0, import_path4.join)(storageRoot, "part", messageId);
   if ((0, import_fs6.existsSync)(partDir)) {
     const files = (0, import_fs6.readdirSync)(partDir).filter((f) => f.endsWith(".json")).sort();
     for (const f of files) {
       try {
-        const raw = await (0, import_promises2.readFile)((0, import_path3.join)(partDir, f), "utf8");
+        const raw = await (0, import_promises2.readFile)((0, import_path4.join)(partDir, f), "utf8");
         parts.push(JSON.parse(raw));
       } catch {
       }
@@ -13545,7 +13551,7 @@ function generateId6(seed) {
 
 // src/git.ts
 var import_fs8 = require("fs");
-var import_path4 = require("path");
+var import_path5 = require("path");
 function detectGitContext(cwd) {
   if (!cwd) {
     return emptyContext();
@@ -13554,11 +13560,11 @@ function detectGitContext(cwd) {
   if (!repoRoot) {
     return emptyContext();
   }
-  const gitPath = (0, import_path4.join)(repoRoot, ".git");
+  const gitPath = (0, import_path5.join)(repoRoot, ".git");
   const isWorktree = isGitFile(gitPath);
   const worktreeRoot = isWorktree ? resolveWorktreeRoot(gitPath) : null;
   const branch = readBranch(repoRoot);
-  const repoName = (0, import_path4.basename)(worktreeRoot ?? repoRoot);
+  const repoName = (0, import_path5.basename)(worktreeRoot ?? repoRoot);
   return {
     repoRoot,
     repoName,
@@ -13579,9 +13585,9 @@ function emptyContext() {
 function findGitRoot(dir) {
   let current = dir;
   for (; ; ) {
-    const candidate = (0, import_path4.join)(current, ".git");
+    const candidate = (0, import_path5.join)(current, ".git");
     if ((0, import_fs8.existsSync)(candidate)) return current;
-    const parent = (0, import_path4.dirname)(current);
+    const parent = (0, import_path5.dirname)(current);
     if (parent === current) return null;
     current = parent;
   }
@@ -13599,8 +13605,8 @@ function resolveWorktreeRoot(gitFilePath) {
     const match = content.match(/^gitdir:\s*(.+)$/m);
     if (!match || !match[1]) return null;
     const gitdirPath = match[1].trim();
-    const repoGitDir = (0, import_path4.dirname)((0, import_path4.dirname)(gitdirPath));
-    const repoRoot = (0, import_path4.dirname)(repoGitDir);
+    const repoGitDir = (0, import_path5.dirname)((0, import_path5.dirname)(gitdirPath));
+    const repoRoot = (0, import_path5.dirname)(repoGitDir);
     return (0, import_fs8.existsSync)(repoGitDir) ? repoRoot : null;
   } catch {
     return null;
@@ -13608,7 +13614,7 @@ function resolveWorktreeRoot(gitFilePath) {
 }
 function readBranch(repoRoot) {
   try {
-    const headPath = (0, import_path4.join)(repoRoot, ".git", "HEAD");
+    const headPath = (0, import_path5.join)(repoRoot, ".git", "HEAD");
     const content = (0, import_fs8.readFileSync)(headPath, "utf8").trim();
     const refMatch = content.match(/^ref:\s*refs\/heads\/(.+)$/);
     if (refMatch && refMatch[1]) return refMatch[1];
@@ -13626,14 +13632,14 @@ var SCAN_CONCURRENCY = 8;
 function getCursorAppDataPath() {
   const home = (0, import_os2.homedir)();
   if (process.platform === "darwin") {
-    return (0, import_path5.join)(home, "Library", "Application Support", "Cursor");
+    return (0, import_path6.join)(home, "Library", "Application Support", "Cursor");
   }
   if (process.platform === "win32") {
     const appData = process.env.APPDATA;
-    return appData ? (0, import_path5.join)(appData, "Cursor") : null;
+    return appData ? (0, import_path6.join)(appData, "Cursor") : null;
   }
   const xdg = process.env.XDG_CONFIG_HOME;
-  return (0, import_path5.join)(xdg ?? (0, import_path5.join)(home, ".config"), "Cursor");
+  return (0, import_path6.join)(xdg ?? (0, import_path6.join)(home, ".config"), "Cursor");
 }
 var claudeAdapter = new ClaudeAdapter();
 var codexAdapter = new CodexAdapter();
@@ -13917,7 +13923,7 @@ function createListCommand() {
       console.log(source_default.bold(`
 Found ${sessions.length} session(s)${sessions.length > limit ? `, showing first ${limit}` : ""}
 `));
-      const ID_W = 10;
+      const ID_W = 37;
       const PROV_W = 8;
       const TITLE_W = 40;
       const REPO_W = 18;
@@ -13935,7 +13941,7 @@ Found ${sessions.length} session(s)${sessions.length > limit ? `, showing first 
         const branch = truncate(s.git?.branch ?? "", BRANCH_W - 2);
         const date = s.startTime?.toISOString().slice(0, 10) ?? s.endTime?.toISOString().slice(0, 10) ?? "";
         console.log(
-          source_default.cyan(padEnd2(s.id.slice(0, ID_W - 1), ID_W)) + padEnd2(s.provider, PROV_W) + padEnd2(title, TITLE_W) + source_default.gray(padEnd2(repo, REPO_W)) + source_default.gray(padEnd2(branch, BRANCH_W)) + source_default.gray(date)
+          source_default.cyan(padEnd2(s.id, ID_W)) + padEnd2(s.provider, PROV_W) + padEnd2(title, TITLE_W) + source_default.gray(padEnd2(repo, REPO_W)) + source_default.gray(padEnd2(branch, BRANCH_W)) + source_default.gray(date)
         );
       }
       if (sessions.length > limit) {
@@ -13963,7 +13969,7 @@ function truncate(s, max2) {
 
 // src/cli/export.ts
 var import_fs11 = require("fs");
-var import_path7 = require("path");
+var import_path8 = require("path");
 
 // src/render/markdown.ts
 var DEFAULT_MARKDOWN_OPTIONS = {
@@ -14115,7 +14121,7 @@ function escapeMarkdown(s) {
 
 // src/export/docx.ts
 var import_fs10 = require("fs");
-var import_path6 = require("path");
+var import_path7 = require("path");
 
 // node_modules/docx/dist/index.mjs
 var __defProp2 = Object.defineProperty;
@@ -14139,7 +14145,7 @@ var __spreadValues = (a, b) => {
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var __async = (__this, __arguments, generator) => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve2, reject) => {
     var fulfilled = (value) => {
       try {
         step(generator.next(value));
@@ -14154,7 +14160,7 @@ var __async = (__this, __arguments, generator) => {
         reject(e);
       }
     };
-    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    var step = (x) => x.done ? resolve2(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
     step((generator = generator.apply(__this, __arguments)).next());
   });
 };
@@ -14666,7 +14672,7 @@ function requireEvents() {
     return ret;
   }
   function once(emitter, name) {
-    return new Promise(function(resolve, reject) {
+    return new Promise(function(resolve2, reject) {
       function errorListener(err) {
         emitter.removeListener(name, resolver);
         reject(err);
@@ -14675,7 +14681,7 @@ function requireEvents() {
         if (typeof emitter.removeListener === "function") {
           emitter.removeListener("error", errorListener);
         }
-        resolve([].slice.call(arguments));
+        resolve2([].slice.call(arguments));
       }
       eventTargetAgnosticAddListener(emitter, name, resolver, { once: true });
       if (name !== "error") {
@@ -18592,8 +18598,8 @@ function requireUtil() {
       }
       function fn() {
         var promiseResolve, promiseReject;
-        var promise = new Promise(function(resolve, reject) {
-          promiseResolve = resolve;
+        var promise = new Promise(function(resolve2, reject) {
+          promiseResolve = resolve2;
           promiseReject = reject;
         });
         var args = [];
@@ -20155,14 +20161,14 @@ function requireAsync_iterator() {
     };
   }
   function readAndResolve(iter) {
-    var resolve = iter[kLastResolve];
-    if (resolve !== null) {
+    var resolve2 = iter[kLastResolve];
+    if (resolve2 !== null) {
       var data = iter[kStream].read();
       if (data !== null) {
         iter[kLastPromise] = null;
         iter[kLastResolve] = null;
         iter[kLastReject] = null;
-        resolve(createIterResult(data, false));
+        resolve2(createIterResult(data, false));
       }
     }
   }
@@ -20170,13 +20176,13 @@ function requireAsync_iterator() {
     process$1.nextTick(readAndResolve, iter);
   }
   function wrapForNext(lastPromise, iter) {
-    return function(resolve, reject) {
+    return function(resolve2, reject) {
       lastPromise.then(function() {
         if (iter[kEnded]) {
-          resolve(createIterResult(void 0, true));
+          resolve2(createIterResult(void 0, true));
           return;
         }
-        iter[kHandlePromise](resolve, reject);
+        iter[kHandlePromise](resolve2, reject);
       }, reject);
     };
   }
@@ -20196,12 +20202,12 @@ function requireAsync_iterator() {
         return Promise.resolve(createIterResult(void 0, true));
       }
       if (this[kStream].destroyed) {
-        return new Promise(function(resolve, reject) {
+        return new Promise(function(resolve2, reject) {
           process$1.nextTick(function() {
             if (_this[kError]) {
               reject(_this[kError]);
             } else {
-              resolve(createIterResult(void 0, true));
+              resolve2(createIterResult(void 0, true));
             }
           });
         });
@@ -20224,13 +20230,13 @@ function requireAsync_iterator() {
     return this;
   }), _defineProperty(_Object$setPrototypeO, "return", function _return() {
     var _this2 = this;
-    return new Promise(function(resolve, reject) {
+    return new Promise(function(resolve2, reject) {
       _this2[kStream].destroy(null, function(err) {
         if (err) {
           reject(err);
           return;
         }
-        resolve(createIterResult(void 0, true));
+        resolve2(createIterResult(void 0, true));
       });
     });
   }), _Object$setPrototypeO), AsyncIteratorPrototype);
@@ -20252,15 +20258,15 @@ function requireAsync_iterator() {
       value: stream._readableState.endEmitted,
       writable: true
     }), _defineProperty(_Object$create, kHandlePromise, {
-      value: function value(resolve, reject) {
+      value: function value(resolve2, reject) {
         var data = iterator[kStream].read();
         if (data) {
           iterator[kLastPromise] = null;
           iterator[kLastResolve] = null;
           iterator[kLastReject] = null;
-          resolve(createIterResult(data, false));
+          resolve2(createIterResult(data, false));
         } else {
-          iterator[kLastResolve] = resolve;
+          iterator[kLastResolve] = resolve2;
           iterator[kLastReject] = reject;
         }
       },
@@ -20279,12 +20285,12 @@ function requireAsync_iterator() {
         iterator[kError] = err;
         return;
       }
-      var resolve = iterator[kLastResolve];
-      if (resolve !== null) {
+      var resolve2 = iterator[kLastResolve];
+      if (resolve2 !== null) {
         iterator[kLastPromise] = null;
         iterator[kLastResolve] = null;
         iterator[kLastReject] = null;
-        resolve(createIterResult(void 0, true));
+        resolve2(createIterResult(void 0, true));
       }
       iterator[kEnded] = true;
     });
@@ -32726,7 +32732,7 @@ function requireXml() {
       }
     }
     function add(value, last) {
-      format(append, resolve(value, indent, indent ? 1 : 0), last);
+      format(append, resolve2(value, indent, indent ? 1 : 0), last);
     }
     function end() {
       if (stream) {
@@ -32771,7 +32777,7 @@ function requireXml() {
   }
   function element() {
     var input = Array.prototype.slice.call(arguments), self2 = {
-      _elem: resolve(input)
+      _elem: resolve2(input)
     };
     self2.push = function(input2) {
       if (!this.append) {
@@ -32781,7 +32787,7 @@ function requireXml() {
       var indent = this._elem.indent;
       format(
         this.append,
-        resolve(
+        resolve2(
           input2,
           indent,
           this._elem.icount + (indent ? 1 : 0)
@@ -32804,7 +32810,7 @@ function requireXml() {
   function create_indent(character, count) {
     return new Array(count || 0).join(character || "");
   }
-  function resolve(data, indent, indent_count) {
+  function resolve2(data, indent, indent_count) {
     indent_count = indent_count || 0;
     var indent_spaces = create_indent(indent, indent_count);
     var name;
@@ -32851,7 +32857,7 @@ function requireXml() {
               if (_name == "_attr") {
                 get_attributes(value._attr);
               } else {
-                content.push(resolve(
+                content.push(resolve2(
                   value,
                   indent,
                   indent_count + 1
@@ -35951,7 +35957,7 @@ async function exportToDocx(markdownContent, outputPath) {
     }
   });
   const buffer2 = await Packer.toBuffer(doc);
-  (0, import_fs10.mkdirSync)((0, import_path6.dirname)(outputPath), { recursive: true });
+  (0, import_fs10.mkdirSync)((0, import_path7.dirname)(outputPath), { recursive: true });
   (0, import_fs10.writeFileSync)(outputPath, buffer2);
 }
 function tokensToDocxElements(tokens) {
@@ -36191,11 +36197,12 @@ function createExportCommand() {
       const { sessions, errors: parseErrors } = await parseSessions(toExport);
       const allErrors = [...scanErrors, ...parseErrors];
       spinner.text = "Rendering\u2026";
-      (0, import_fs11.mkdirSync)(opts.output, { recursive: true });
+      const outputDir = (0, import_path8.resolve)(opts.output);
+      (0, import_fs11.mkdirSync)(outputDir, { recursive: true });
       const outputFiles = [];
       if (mode === "combined") {
         const filename = `combined-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
-        const outPath = (0, import_path7.join)(opts.output, filename);
+        const outPath = (0, import_path8.join)(outputDir, filename);
         if (format === "json") {
           (0, import_fs11.writeFileSync)(outPath, sessionsToJson(sessions), "utf8");
         } else {
@@ -36208,7 +36215,7 @@ function createExportCommand() {
           const title = session.title ?? "untitled";
           const slug = slugify(title);
           const filename = `${session.provider}-${session.id.slice(0, 8)}-${slug}.${format}`;
-          const outPath = (0, import_path7.join)(opts.output, filename);
+          const outPath = (0, import_path8.join)(outputDir, filename);
           if (format === "json") {
             (0, import_fs11.writeFileSync)(outPath, sessionsToJson([session]), "utf8");
           } else {
@@ -36221,7 +36228,7 @@ function createExportCommand() {
         const byProvider = groupBy(sessions, (s) => s.provider);
         for (const [provider, group] of byProvider) {
           const filename = `${provider}-sessions-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
-          const outPath = (0, import_path7.join)(opts.output, filename);
+          const outPath = (0, import_path8.join)(outputDir, filename);
           if (format === "json") {
             (0, import_fs11.writeFileSync)(outPath, sessionsToJson(group), "utf8");
           } else {
@@ -36235,7 +36242,7 @@ function createExportCommand() {
         for (const [repo, group] of byRepo) {
           const slug = slugify(repo);
           const filename = `${slug}-sessions-${formatDate(/* @__PURE__ */ new Date())}.${format}`;
-          const outPath = (0, import_path7.join)(opts.output, filename);
+          const outPath = (0, import_path8.join)(outputDir, filename);
           if (format === "json") {
             (0, import_fs11.writeFileSync)(outPath, sessionsToJson(group), "utf8");
           } else {

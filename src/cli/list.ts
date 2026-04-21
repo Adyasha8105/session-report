@@ -64,7 +64,7 @@ export function createListCommand(): Command {
         console.log(chalk.bold(`\nFound ${sessions.length} session(s)${sessions.length > limit ? `, showing first ${limit}` : ''}\n`));
 
         // Column widths
-        const ID_W = 10;
+        const ID_W = 37;
         const PROV_W = 8;
         const TITLE_W = 40;
         const REPO_W = 18;
@@ -90,7 +90,7 @@ export function createListCommand(): Command {
           const date = s.startTime?.toISOString().slice(0, 10) ?? s.endTime?.toISOString().slice(0, 10) ?? '';
 
           console.log(
-            chalk.cyan(padEnd(s.id.slice(0, ID_W - 1), ID_W)) +
+            chalk.cyan(padEnd(s.id, ID_W)) +
             padEnd(s.provider, PROV_W) +
             padEnd(title, TITLE_W) +
             chalk.gray(padEnd(repo, REPO_W)) +

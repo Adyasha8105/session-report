@@ -10,6 +10,12 @@ import { ParseError } from '../util/errors.js';
 
 const RAW_JSON_CAP = 8192;
 const STORAGE_ROOT = '~/.local/share/opencode/storage';
+const SAFE_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/;
+
+function safeId(id: string): string {
+  if (!SAFE_ID_RE.test(id)) throw new Error(`Unsafe session/message ID: ${JSON.stringify(id)}`);
+  return id;
+}
 
 // ---- Raw shapes ----
 
@@ -61,7 +67,7 @@ export class OpenCodeAdapter implements ProviderAdapter {
       const stat = statSync(filePath);
       const raw = await readFile(filePath, 'utf8');
       const data = JSON.parse(raw) as OpenCodeSessionJson;
-      const sessionId = data.id ?? fileHash(filePath);
+      const sessionId = safeId(data.id ?? fileHash(filePath));
 
       // Estimate event count from message directory
       const storageRoot = expandTilde(STORAGE_ROOT);
@@ -99,7 +105,7 @@ export class OpenCodeAdapter implements ProviderAdapter {
       const stat = statSync(filePath);
       const raw = await readFile(filePath, 'utf8');
       const data = JSON.parse(raw) as OpenCodeSessionJson;
-      const sessionId = data.id ?? fileHash(filePath);
+      const sessionId = safeId(data.id ?? fileHash(filePath));
       const events: SessionEvent[] = [];
       let model: string | null = null;
 
@@ -124,7 +130,7 @@ export class OpenCodeAdapter implements ProviderAdapter {
 
             const kind = normalizeEventKind(undefined, msg.role);
             const ts = msg.time?.created ? new Date(msg.time.created) : null;
-            const msgId = msg.id ?? fileHash(msgPath);
+            const msgId = safeId(msg.id ?? fileHash(msgPath));
 
             // Load message parts
             const parts = await loadParts(storageRoot, msgId);
